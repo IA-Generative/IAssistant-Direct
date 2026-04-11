@@ -22,6 +22,24 @@
     "Detection automatique des plateformes",
     "Enrollment et relay via Device Management"
   ],
+  "install_instructions": {
+    "title": "Installer MirAI Recorder sur Chromium ou Microsoft Edge",
+    "intro": "Aucun droit administrateur n'est necessaire. L'installation prend moins d'une minute.",
+    "steps": [
+      "Telechargez le fichier .crx depuis ce catalogue et enregistrez-le (par defaut dans votre dossier Telechargements).",
+      "Ouvrez un nouvel onglet et tapez dans la barre d'adresse : chrome://extensions (pour Chromium) ou edge://extensions (pour Edge), puis validez avec Entree.",
+      "En haut a droite de la page, activez le bouton 'Mode developpeur'.",
+      "Faites glisser le fichier .crx que vous venez de telecharger directement dans la page des extensions.",
+      "Cliquez sur 'Ajouter l'extension' dans la fenetre de confirmation qui s'affiche."
+    ],
+    "post_install": "L'icone MirAI apparait en haut a droite de votre navigateur. Cliquez dessus puis connectez-vous avec votre compte ministeriel. L'extension est prete : rendez-vous sur une page de reunion (Webconf, Visio, COMU, Webex, GMeet, Teams) pour utiliser le bouton REC.",
+    "troubleshooting": [
+      "Si le fichier .crx ne se depose pas : verifiez que le 'Mode developpeur' est bien active.",
+      "Si un message indique que les extensions ne peuvent venir que du Chrome Web Store : votre navigateur est en version bridee. Demandez a votre referent informatique de vous fournir une version Chromium ou Edge permettant les extensions hors-store.",
+      "Si l'icone MirAI n'apparait pas : cliquez sur la piece de puzzle a droite de la barre d'adresse, puis sur l'epingle a cote de 'MirAI Recorder' pour l'afficher en permanence."
+    ],
+    "support": "En cas de probleme persistant, contactez fabrique-numerique@interieur.gouv.fr"
+  },
   "changelog": [
     {
       "version": "1.2.2",

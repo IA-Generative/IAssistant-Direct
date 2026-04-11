@@ -92,6 +92,7 @@ payload = {
     'doc_url': manifest.get('doc_url', ''),
     'license': manifest.get('license', ''),
     'key_features': manifest.get('key_features', []),
+    'install_instructions': manifest.get('install_instructions', {}),
     'changelog': manifest.get('changelog', []),
     'config_template': config
 }
