@@ -43,10 +43,11 @@ describe('dm/config.json', () => {
     expect(config.configVersion).toBe(1);
   });
 
-  test('contient les profils dev, int, prod', () => {
+  test('contient les profils dev, int, prod-scaleway, prod-dgx', () => {
     expect(config.dev).toBeDefined();
     expect(config.int).toBeDefined();
-    expect(config.prod).toBeDefined();
+    expect(config['prod-scaleway']).toBeDefined();
+    expect(config['prod-dgx']).toBeDefined();
   });
 
   test('contient slug et activeProfile', () => {
@@ -65,13 +66,23 @@ describe('dm/config.json', () => {
     expect(config.int.comuUrl).toBeDefined();
   });
 
-  test('profil prod pointe sur sso.mirai.interieur.gouv.fr', () => {
-    expect(config.prod.keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
-    expect(config.prod.keycloakRealm).toBe('mirai');
+  test('profils prod pointent sur sso.mirai.interieur.gouv.fr', () => {
+    for (const p of ['prod-scaleway', 'prod-dgx']) {
+      expect(config[p].keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
+      expect(config[p].keycloakRealm).toBe('mirai');
+    }
+  });
+
+  test('profil prod-scaleway pointe sur bootstrap.fake-domain.name', () => {
+    expect(config['prod-scaleway'].bootstrap_url).toBe('https://bootstrap.fake-domain.name');
+  });
+
+  test('profil prod-dgx pointe sur onyxia.gpu.minint.fr', () => {
+    expect(config['prod-dgx'].bootstrap_url).toBe('https://onyxia.gpu.minint.fr/bootstrap');
   });
 
   test('chaque profil a un bootstrap_url et config_path', () => {
-    for (const p of ['dev', 'int', 'prod']) {
+    for (const p of ['dev', 'int', 'prod-scaleway', 'prod-dgx']) {
       expect(config[p].bootstrap_url).toBeDefined();
       expect(config[p].config_path).toBeDefined();
     }

@@ -1,7 +1,7 @@
 {
   "configVersion": 1,
   "slug": "mirai-browser",
-  "activeProfile": "prod",
+  "activeProfile": "prod-scaleway",
   "default": {
     "portal_url": "https://mirai.interieur.gouv.fr",
     "doc_url": "https://github.com/IA-Generative/AssistantMiraiLibreOffice/blob/master/docs/notice-utilisateur.md",
@@ -47,11 +47,28 @@
     "aideUrl": "https://mirai.interieur.gouv.fr/aide",
     "comuUrl": "https://webconf.comu.gouv.fr/"
   },
-  "prod": {
-    "_description": "Production",
+  "prod-scaleway": {
+    "_description": "Production Scaleway (cloud)",
     "bootstrap_url": "https://bootstrap.fake-domain.name",
-    "config_path": "/config/mirai-browser/config.json?profile=prod",
+    "config_path": "/config/mirai-browser/config.json?profile=prod-scaleway",
     "relayAssistantBaseUrl": "https://bootstrap.fake-domain.name/relay-assistant",
+    "keycloakIssuerUrl": "https://sso.mirai.interieur.gouv.fr/",
+    "keycloakRealm": "mirai",
+    "keycloakClientId": "mirai-extension",
+    "keycloak_redirect_uri": "${{KEYCLOAK_REDIRECT_URI}}",
+    "keycloak_allowed_redirect_uri": "${{KEYCLOAK_ALLOWED_REDIRECT_URI}}",
+    "apiBase": "https://compte-rendu.mirai.interieur.gouv.fr/api",
+    "chatUrl": "https://chat.mirai.interieur.gouv.fr/",
+    "resumeUrl": "https://resume.mirai.interieur.gouv.fr/",
+    "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
+    "aideUrl": "https://mirai.interieur.gouv.fr/aide",
+    "comuUrl": "https://webconf.comu.gouv.fr/"
+  },
+  "prod-dgx": {
+    "_description": "Production DGX (onyxia.gpu.minint.fr)",
+    "bootstrap_url": "https://onyxia.gpu.minint.fr/bootstrap",
+    "config_path": "/config/mirai-browser/config.json?profile=prod-dgx",
+    "relayAssistantBaseUrl": "https://onyxia.gpu.minint.fr/bootstrap/relay-assistant",
     "keycloakIssuerUrl": "https://sso.mirai.interieur.gouv.fr/",
     "keycloakRealm": "mirai",
     "keycloakClientId": "mirai-extension",

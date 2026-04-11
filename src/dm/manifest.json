@@ -37,7 +37,8 @@
         "Point rouge pulsant dans la liste des onglets du popup",
         "Lien de reconnexion SSO direct depuis l'overlay",
         "Refresh token automatique periodique dans le popup",
-        "Bouton Overlay dans le popup pour forcer l'affichage"
+        "Bouton Overlay dans le popup pour forcer l'affichage",
+        "Build multi-cible on-premise (profils prod-scaleway / prod-dgx, flag --target sur build.sh et deploy-release.sh)"
       ]
     },
     {
