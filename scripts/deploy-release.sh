@@ -81,6 +81,12 @@ cp "$EXT_DIR/README.md" "$BUILD_DIR/" 2>/dev/null || true
 cp -r "$EXT_DIR/src/" "$BUILD_DIR/src/"
 cp -r "$EXT_DIR/icons/" "$BUILD_DIR/icons/"
 
+# DM icon: see build.sh for rationale. Duplicate icons/icon128.png into
+# assets/icon128.png at ZIP root so device-management can extract it and
+# render it as a base64 data URL in the catalog.
+mkdir -p "$BUILD_DIR/assets"
+cp "$EXT_DIR/icons/icon128.png" "$BUILD_DIR/assets/icon128.png"
+
 # Inject update_url into manifest.json for auto-update (suffixed by target)
 python3 -c "
 import json

@@ -60,6 +60,16 @@ cp -r "$ROOT_DIR/icons/" "$EXT_DIR/icons/"
 cp "$ROOT_DIR/src/dm/manifest.json" "$EXT_DIR/dm-manifest.json"
 cp "$ROOT_DIR/src/dm/config.json" "$EXT_DIR/dm-config.json"
 
+# DM icon: convention device-management is to look up basenames
+# {logo.png, icon128.png, icon48.png} inside an assets/ directory at
+# the ZIP root. See app/admin/router.py:1531-1541 in device-management.
+# We duplicate icons/icon128.png into assets/icon128.png so the DM can
+# extract it at upload time and render it as a base64 data URL in the
+# catalog, without needing outbound network access from the admin UI
+# (critical on closed networks like DGX).
+mkdir -p "$EXT_DIR/assets"
+cp "$ROOT_DIR/icons/icon128.png" "$EXT_DIR/assets/icon128.png"
+
 # ──────────────────────────────────────────────
 # 2.b Target-specific patches (dist/ only, sources untouched)
 # ──────────────────────────────────────────────

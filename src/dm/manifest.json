@@ -10,7 +10,7 @@
   "maturity": "beta",
   "homepage_url": "https://github.com/IA-Generative/mirai-assistant-navigateur",
   "support_email": "fabrique-numerique@interieur.gouv.fr",
-  "icon_url": "https://raw.githubusercontent.com/IA-Generative/mirai-assistant-navigateur/main/icons/icon128.png",
+  "icon_url": "assets/icon128.png",
   "doc_url": "https://mirai.interieur.gouv.fr/aide",
   "license": "MPL-2.0",
   "key_features": [
