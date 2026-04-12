@@ -65,12 +65,12 @@
     "comuUrl": "https://webconf.comu.gouv.fr/"
   },
   "prod-dgx": {
-    "_description": "Production DGX (onyxia.gpu.minint.fr)",
+    "_description": "Production DGX (onyxia.gpu.minint.fr) — Keycloak via relay (flux sortants bloques)",
     "bootstrap_url": "https://onyxia.gpu.minint.fr/bootstrap",
     "config_path": "/config/mirai-browser/config.json?profile=prod-dgx",
     "relayAssistantBaseUrl": "https://onyxia.gpu.minint.fr/bootstrap/relay-assistant",
-    "keycloakIssuerUrl": "https://sso.mirai.interieur.gouv.fr/",
-    "keycloakRealm": "mirai",
+    "keycloakIssuerUrl": "https://onyxia.gpu.minint.fr/bootstrap/relay-assistant/keycloak",
+    "keycloakRealm": "",
     "keycloakClientId": "mirai-extension",
     "keycloak_redirect_uri": "${{KEYCLOAK_REDIRECT_URI}}",
     "keycloak_allowed_redirect_uri": "${{KEYCLOAK_ALLOWED_REDIRECT_URI}}",

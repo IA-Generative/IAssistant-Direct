@@ -66,19 +66,27 @@ describe('dm/config.json', () => {
     expect(config.int.comuUrl).toBeDefined();
   });
 
-  test('profils prod pointent sur sso.mirai.interieur.gouv.fr', () => {
-    for (const p of ['prod-scaleway', 'prod-dgx']) {
-      expect(config[p].keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
-      expect(config[p].keycloakRealm).toBe('mirai');
-    }
-  });
-
-  test('profil prod-scaleway pointe sur bootstrap.fake-domain.name', () => {
+  test('profil prod-scaleway pointe Keycloak sur sso.mirai.interieur.gouv.fr', () => {
+    expect(config['prod-scaleway'].keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
+    expect(config['prod-scaleway'].keycloakRealm).toBe('mirai');
     expect(config['prod-scaleway'].bootstrap_url).toBe('https://bootstrap.fake-domain.name');
   });
 
-  test('profil prod-dgx pointe sur onyxia.gpu.minint.fr', () => {
+  test('profil prod-dgx pointe Keycloak via le relay (flux sortants bloques)', () => {
+    // Sur DGX, Chromium ne peut pas joindre directement sso.mirai.interieur.gouv.fr.
+    // L'extension pointe donc l'issuer sur le relay-assistant qui reverse-proxy Keycloak.
+    expect(config['prod-dgx'].keycloakIssuerUrl).toBe(
+      'https://onyxia.gpu.minint.fr/bootstrap/relay-assistant/keycloak'
+    );
+    // keycloakRealm vide pour ne pas que _normalizeRealmBase ajoute /realms/mirai
+    // dans le path (le relay nginx expose /keycloak/protocol/... sans segment realm).
+    expect(config['prod-dgx'].keycloakRealm).toBe('');
     expect(config['prod-dgx'].bootstrap_url).toBe('https://onyxia.gpu.minint.fr/bootstrap');
+  });
+
+  test('les deux profils prod partagent le meme client Keycloak', () => {
+    expect(config['prod-scaleway'].keycloakClientId).toBe('mirai-extension');
+    expect(config['prod-dgx'].keycloakClientId).toBe('mirai-extension');
   });
 
   test('chaque profil a un bootstrap_url et config_path', () => {
