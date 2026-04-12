@@ -85,9 +85,15 @@ async function _ensureTokenFresh() {
     console.info('[MirAI] Token expired, refreshing...');
     const { dmConfig } = await api.storage.local.get({ dmConfig: null });
     const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr').replace(/\/+$/, '');
-    const realm = dmConfig?.keycloakRealm || 'mirai';
+    // Realm must NOT fall back to 'mirai' when explicitly empty (DGX relay
+    // exposes /keycloak/protocol/... without a realm segment in the path;
+    // the real realm is injected server-side via RELAY_KEYCLOAK_UPSTREAM).
+    const realm = dmConfig?.keycloakRealm;
     const clientId = dmConfig?.keycloakClientId || 'mirai-extension';
-    let tokenUrl = issuerUrl.includes('/realms/') ? issuerUrl : `${issuerUrl}/realms/${realm}`;
+    let tokenUrl = issuerUrl;
+    if (!issuerUrl.includes('/realms/') && realm) {
+      tokenUrl = `${issuerUrl}/realms/${realm}`;
+    }
     tokenUrl += '/protocol/openid-connect/token';
 
     const resp = await fetch(tokenUrl, {
@@ -324,9 +330,15 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       try {
         const { dmConfig } = await api.storage.local.get({ dmConfig: null });
         const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr').replace(/\/+$/, '');
-        const realm = dmConfig?.keycloakRealm || 'mirai';
+        // Realm must NOT fall back to 'mirai' when explicitly empty (DGX relay
+        // exposes /keycloak/protocol/... without a realm segment in the path;
+        // the real realm is injected server-side via RELAY_KEYCLOAK_UPSTREAM).
+        const realm = dmConfig?.keycloakRealm;
         const clientId = dmConfig?.keycloakClientId || 'mirai-extension';
-        let authBase = issuerUrl.includes('/realms/') ? issuerUrl : `${issuerUrl}/realms/${realm}`;
+        let authBase = issuerUrl;
+        if (!issuerUrl.includes('/realms/') && realm) {
+          authBase = `${issuerUrl}/realms/${realm}`;
+        }
 
         const callbackUrl = api.runtime.getURL('src/callback.html');
 
