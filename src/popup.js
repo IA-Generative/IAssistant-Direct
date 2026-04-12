@@ -945,11 +945,9 @@ async function checkKeycloakSession(force = false) {
 async function openMiraiShortcut(target) {
   const _sc = window.DMBootstrap?.getConfig() || {};
   const urls = {
-    chat: _sc.chatUrl || 'https://chat.mirai.interieur.gouv.fr/',
-    resume: _sc.resumeUrl || 'https://resume.mirai.interieur.gouv.fr/',
     compterendu: _sc.compteRenduUrl || 'https://compte-rendu.mirai.interieur.gouv.fr/',
-    aide: _sc.aideUrl || 'https://mirai.interieur.gouv.fr/aide',
-    comu: _sc.comuUrl || 'https://webconf.comu.gouv.fr/'
+    comu: _sc.comuUrl || 'https://webconf.comu.gouv.fr/',
+    visio: _sc.visioUrl || 'https://visio.numerique.gouv.fr/'
   };
 
   if (!urls[target]) {
@@ -973,17 +971,13 @@ async function openMiraiShortcut(target) {
 // 🧭 Attachement des raccourcis dans le popup
 // ======================================================================
 document.addEventListener('DOMContentLoaded', () => {
-  const chat = document.getElementById('shortcut-chat');
-  const summary = document.getElementById('shortcut-summary');
   const report = document.getElementById('shortcut-report');
-  const help = document.getElementById('shortcut-help');
-  const comu = document.getElementById('shortcut-comu');  
+  const comu = document.getElementById('shortcut-comu');
+  const visio = document.getElementById('shortcut-visio');
 
-  if (chat) chat.addEventListener('click', () => openMiraiShortcut('chat'));
-  if (summary) summary.addEventListener('click', () => openMiraiShortcut('resume'));
   if (report) report.addEventListener('click', () => openMiraiShortcut('compterendu'));
-  if (help) help.addEventListener('click', () => openMiraiShortcut('aide'));
   if (comu) comu.addEventListener('click', () => openMiraiShortcut('comu'));
+  if (visio) visio.addEventListener('click', () => openMiraiShortcut('visio'));
 });
 
 // 🔹 Mise à jour automatique de la détection de plateforme à l'ouverture du popup

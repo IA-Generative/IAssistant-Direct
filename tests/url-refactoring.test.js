@@ -46,11 +46,9 @@ describe('URL refactoring — popup.js', () => {
   });
 
   test('raccourcis utilisent les URLs depuis config', () => {
-    expect(code).toContain("_sc.chatUrl || 'https://chat.mirai.interieur.gouv.fr/'");
-    expect(code).toContain("_sc.resumeUrl || 'https://resume.mirai.interieur.gouv.fr/'");
     expect(code).toContain("_sc.compteRenduUrl || 'https://compte-rendu.mirai.interieur.gouv.fr/'");
-    expect(code).toContain("_sc.aideUrl || 'https://mirai.interieur.gouv.fr/aide'");
     expect(code).toContain("_sc.comuUrl || 'https://webconf.comu.gouv.fr/'");
+    expect(code).toContain("_sc.visioUrl || 'https://visio.numerique.gouv.fr/'");
   });
 
   test('raccourcis utilisent MiraiAuth.ensureAuthenticated', () => {
@@ -78,7 +76,9 @@ describe('URL refactoring — options.js', () => {
   });
 
   test('raccourcis options utilisent DMBootstrap', () => {
-    expect(code).toContain("_sc.chatUrl || 'https://mirai.interieur.gouv.fr/app/chat'");
+    expect(code).toContain("_sc.compteRenduUrl || 'https://compte-rendu.mirai.interieur.gouv.fr/'");
+    expect(code).toContain("_sc.comuUrl || 'https://webconf.comu.gouv.fr/'");
+    expect(code).toContain("_sc.visioUrl || 'https://visio.numerique.gouv.fr/'");
   });
 });
 
