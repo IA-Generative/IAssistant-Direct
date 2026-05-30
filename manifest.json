@@ -66,6 +66,8 @@
         "*://visio.numerique.gouv.fr/*",
         "*://*.comu.gouv.fr/*",
         "*://comu.gouv.fr/*",
+        "*://*.comu.din.gouv.fr/*",
+        "*://comu.din.gouv.fr/*",
         "*://*.webinaire.numerique.gouv.fr/*",
         "*://webinaire.numerique.gouv.fr/*",
         "*://*.webex.com/*",
