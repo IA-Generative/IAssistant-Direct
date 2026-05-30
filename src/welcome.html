@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bienvenue — IAssistant-Direct (by Mirai)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: radial-gradient(1200px 600px at 50% -10%, #1c2940, #0d1320);
+      color: #e8edf5;
+    }
+    .card {
+      width: 460px; max-width: calc(100vw - 40px);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px; padding: 32px 34px;
+      box-shadow: 0 12px 50px rgba(0,0,0,0.4);
+    }
+    .logo { width: 64px; height: 64px; border-radius: 14px; display: block; margin-bottom: 18px; }
+    h1 { font-size: 21px; margin: 0 0 4px; }
+    .sub { color: #9fb0c7; font-size: 13px; margin: 0 0 20px; }
+    p { font-size: 14px; line-height: 1.55; color: #c7d2e0; margin: 0 0 14px; }
+    ul { font-size: 13.5px; line-height: 1.6; color: #c7d2e0; margin: 0 0 22px; padding-left: 18px; }
+    .cta {
+      display: block; width: 100%; border: none; border-radius: 12px;
+      background: #2f81f7; color: #fff; font-size: 15px; font-weight: 600;
+      padding: 13px; cursor: pointer; transition: background .2s;
+    }
+    .cta:hover { background: #4a92ff; }
+    .cta:disabled { opacity: .6; cursor: default; }
+    .later { display: block; width: 100%; margin-top: 10px; background: none; border: none;
+      color: #9fb0c7; font-size: 13px; cursor: pointer; text-decoration: underline; }
+    .status { margin-top: 14px; min-height: 18px; font-size: 13px; text-align: center; }
+    .status.ok { color: #46d17a; } .status.err { color: #ff8a8a; } .status.busy { color: #e3b341; }
+    .foot { margin-top: 18px; font-size: 11px; color: #6b7a90; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="../icons/icon128.png" alt="" />
+    <h1>IAssistant-Direct <span style="opacity:.6;font-weight:400">(by Mirai)</span></h1>
+    <p class="sub">Bienvenue ! Activez le plug-in en vous connectant avec votre compte ministériel.</p>
+    <p>IAssistant-Direct capture et transcrit automatiquement vos réunions en ligne&nbsp;:</p>
+    <ul>
+      <li>Webconf, Visio, COMU, Webex, Google&nbsp;Meet, Teams…</li>
+      <li>Un bouton REC s'affiche sur vos pages de visioconférence.</li>
+      <li>Connexion unique&nbsp;: pas de re-login pendant ~6&nbsp;mois.</li>
+    </ul>
+    <button id="connect" class="cta">Se connecter pour activer</button>
+    <button id="later" class="later">Plus tard</button>
+    <div id="status" class="status"></div>
+    <div class="foot">Connexion SSO sécurisée (Keycloak PKCE). Vos identifiants ne sont pas stockés par l'extension.</div>
+  </div>
+
+  <script src="compat.js"></script>
+  <script src="dm/bootstrap.js"></script>
+  <script src="crypto.js"></script>
+  <script src="auth.js"></script>
+  <script src="welcome.js"></script>
+</body>
+</html>

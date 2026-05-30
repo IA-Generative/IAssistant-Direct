@@ -25,6 +25,16 @@ api.runtime.onInstalled.addListener(async (details) => {
   // Create alarm for periodic config refresh (every 30 min)
   api.alarms.create('dm-config-refresh', { periodInMinutes: 30 });
   console.info('[MirAI DM] Config refresh alarm created (every 30 min).');
+
+  // Premier lancement : page de bienvenue (onboarding + invite a se connecter).
+  if (details.reason === 'install') {
+    try {
+      api.tabs.create({ url: api.runtime.getURL('src/welcome.html') });
+      console.info('[MirAI] First launch : welcome page opened.');
+    } catch (e) {
+      console.warn('[MirAI] Could not open welcome page:', e.message);
+    }
+  }
 });
 
 // Handle config refresh alarm
