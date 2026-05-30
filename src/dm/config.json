@@ -58,8 +58,7 @@
     "chatUrl": "https://chat.mirai.interieur.gouv.fr/",
     "resumeUrl": "https://resume.mirai.interieur.gouv.fr/",
     "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
-    "aideUrl": "https://mirai.interieur.gouv.fr/aide",
-    "comuUrl": "https://webconf.comu.gouv.fr/"
+    "aideUrl": "https://mirai.interieur.gouv.fr/aide"
   },
   "prod-scaleway": {
     "_description": "Build cible Scaleway (cloud). Config runtime servie par le DM sous ?profile=prod ; valeurs ci-dessous = fallback si DM injoignable.",
@@ -91,6 +90,6 @@
     "resumeUrl": "https://resume.mirai.interieur.gouv.fr/",
     "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
     "aideUrl": "https://mirai.interieur.gouv.fr/aide",
-    "comuUrl": "https://webconf.comu.gouv.fr/"
+    "comuUrl": "https://webconf.comu.din.gouv.fr/"
   }
 }
