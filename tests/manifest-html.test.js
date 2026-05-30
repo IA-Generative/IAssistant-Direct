@@ -72,16 +72,22 @@ describe('dm/config.json', () => {
     expect(config['prod-scaleway'].bootstrap_url).toBe('https://bootstrap.fake-domain.name');
   });
 
-  test('profil prod-dgx pointe Keycloak via le relay (flux sortants bloques)', () => {
-    // Sur DGX, Chromium ne peut pas joindre directement sso.mirai.interieur.gouv.fr.
-    // L'extension pointe donc l'issuer sur le relay-assistant qui reverse-proxy Keycloak.
-    expect(config['prod-dgx'].keycloakIssuerUrl).toBe(
-      'https://onyxia.gpu.minint.fr/bootstrap/relay-assistant/keycloak'
-    );
-    // keycloakRealm vide pour ne pas que _normalizeRealmBase ajoute /realms/mirai
-    // dans le path (le relay nginx expose /keycloak/protocol/... sans segment realm).
-    expect(config['prod-dgx'].keycloakRealm).toBe('');
+  test('profil prod-dgx pointe Keycloak en direct (egress navigateur ouvert)', () => {
+    // L'egress navigateur DGX vers Keycloak/mcr est desormais ouvert : on pointe
+    // l'issuer directement sur le SSO (plus de relay), comme Scaleway.
+    expect(config['prod-dgx'].keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
+    expect(config['prod-dgx'].keycloakRealm).toBe('mirai');
     expect(config['prod-dgx'].bootstrap_url).toBe('https://onyxia.gpu.minint.fr/bootstrap');
+    // Le relay n'est plus utilise par l'extension sur DGX.
+    expect(config['prod-dgx'].relayAssistantBaseUrl).toBeUndefined();
+  });
+
+  test('le config_path des profils prod pointe sur ?profile=prod (resolu par chaque DM)', () => {
+    expect(config['prod-dgx'].config_path).toContain('profile=prod');
+    expect(config['prod-scaleway'].config_path).toContain('profile=prod');
+    // Profil generique servi au runtime, avec placeholders resolus cote DM.
+    expect(config.prod.keycloakIssuerUrl).toBe('${{KEYCLOAK_ISSUER_URL}}');
+    expect(config.prod.relayAssistantBaseUrl).toBeUndefined();
   });
 
   test('les deux profils prod partagent le meme client Keycloak', () => {
@@ -98,7 +104,7 @@ describe('dm/config.json', () => {
 
   test('default contient les allowedKeywords', () => {
     expect(config.default.allowedKeywords).toEqual(
-      ['webconf', 'comu', 'webinaire', 'webex', 'gmeet', 'teams']
+      ['webconf', 'visio', 'comu', 'webinaire', 'webex', 'gmeet', 'teams']
     );
   });
 });
@@ -116,7 +122,7 @@ describe('dm/manifest.json', () => {
 
   test('a un changelog avec la version courante', () => {
     expect(manifest.changelog.length).toBeGreaterThanOrEqual(1);
-    expect(manifest.changelog[0].version).toBe('1.2.1');
+    expect(manifest.changelog[0].version).toBe('1.2.2');
   });
 
   test('a les key_features', () => {

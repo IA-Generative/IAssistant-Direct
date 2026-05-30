@@ -75,17 +75,18 @@ window.MiraiAuth = {
   // Token storage
   // ──────────────────────────────────────────────
 
+  // Token stocké CHIFFRÉ au repos via TokenStore (crypto.js). TokenStore gère
+  // aussi la migration transparente d'un éventuel ancien token en clair.
   async _getStoredToken() {
-    const { miraiToken } = await window.CompatAPI.storageGet({ miraiToken: null });
-    return miraiToken;
+    return await TokenStore.getToken();
   },
 
   async _storeToken(tokenData) {
-    await window.CompatAPI.storageSet({ miraiToken: tokenData });
+    await TokenStore.storeToken(tokenData);
   },
 
   async _clearToken() {
-    await window.CompatAPI.storageRemove('miraiToken');
+    await TokenStore.clearToken();
   },
 
   // ──────────────────────────────────────────────
@@ -304,7 +305,7 @@ window.MiraiAuth = {
       const silentParams = {
         client_id: cfg.clientId,
         response_type: 'code',
-        scope: 'openid profile email',
+        scope: 'openid profile email offline_access',
         redirect_uri: cfg.redirectUri,
         code_challenge: codeChallenge,
         code_challenge_method: 'S256'
@@ -313,7 +314,7 @@ window.MiraiAuth = {
       const tabParams = {
         client_id: cfg.clientId,
         response_type: 'code',
-        scope: 'openid profile email',
+        scope: 'openid profile email offline_access',
         redirect_uri: callbackUrl,
         code_challenge: codeChallenge,
         code_challenge_method: 'S256'

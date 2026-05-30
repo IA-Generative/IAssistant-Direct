@@ -1,5 +1,10 @@
 # Prompt — Integrer MirAI Recorder (Chrome Extension) avec Device Management
 
+> ⚠️ **Document HISTORIQUE (2026-03-31)** — prompt utilise pour l'integration DM
+> initiale. Le plug-in est depuis renomme **IAssistant-Direct (by Mirai)** ; voir
+> README + `adr-dgx-deployment.md` pour l'etat courant (DGX direct, `?profile=prod`,
+> session offline 6 mois).
+
 > Version : 1.0 — 2026-03-31
 > Repo : /Users/etiquet/Documents/GitHub/mirai-assistant/chrome-extension
 > Prerequis : DM deploye sur https://bootstrap.fake-domain.name avec le slug `mirai-recorder`

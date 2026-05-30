@@ -43,7 +43,8 @@ async function startMiraiRecording(sessionData) {
 async function getLocalToken() {
   let token = null;
   try {
-    const { miraiToken } = await chrome.storage.local.get({ miraiToken: null });
+    // Token chiffré au repos → passe par TokenStore (crypto.js).
+    const miraiToken = await TokenStore.getToken();
     if (miraiToken && miraiToken.access_token) {
       token = miraiToken.access_token;
     }

@@ -1,6 +1,8 @@
 // background.js — service worker (pas de DOM ici)
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
+// Import crypto.js (TokenStore) FIRST — recording.js et les handlers token en dépendent.
+try { importScripts('crypto.js'); } catch (e) { console.warn('[MirAI] importScripts crypto.js:', e.message); }
 // Import recording.js functions (shared with popup)
 try { importScripts('recording.js'); } catch (e) { console.warn('[MirAI] importScripts recording.js:', e.message); }
 
@@ -78,7 +80,7 @@ api.alarms.onAlarm.addListener(async (alarm) => {
 // Token refresh helper (used by overlay handlers)
 // ======================================================================
 async function _ensureTokenFresh() {
-  let { miraiToken } = await api.storage.local.get({ miraiToken: null });
+  let miraiToken = await TokenStore.getToken();
   if (!miraiToken?.access_token) throw new Error('Non connecte (SSO)');
 
   if (miraiToken.expires_in < Date.now() && miraiToken.refresh_token) {
@@ -112,7 +114,7 @@ async function _ensureTokenFresh() {
         refresh_token: data.refresh_token || miraiToken.refresh_token,
         expires_in: Date.now() + (data.expires_in * 1000)
       };
-      await api.storage.local.set({ miraiToken });
+      await TokenStore.storeToken(miraiToken);
       console.info('[MirAI] Token refreshed in background.');
     } else {
       throw new Error('Refresh token echoue');
@@ -155,12 +157,10 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           });
           if (resp.ok) {
             const data = await resp.json();
-            await api.storage.local.set({
-              miraiToken: {
-                access_token: data.access_token,
-                refresh_token: data.refresh_token,
-                expires_in: Date.now() + (data.expires_in * 1000)
-              }
+            await TokenStore.storeToken({
+              access_token: data.access_token,
+              refresh_token: data.refresh_token,
+              expires_in: Date.now() + (data.expires_in * 1000)
             });
             console.info('[MirAI] Token obtained via overlay PKCE login.');
           }
@@ -266,7 +266,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try {
         await _ensureTokenFresh();
-        const { miraiToken } = await api.storage.local.get({ miraiToken: null });
+        const miraiToken = await TokenStore.getToken();
         const { dmConfig } = await api.storage.local.get({ dmConfig: null });
         const apiBase = dmConfig?.apiBase || 'https://compte-rendu.mirai.interieur.gouv.fr/api';
         const token = miraiToken?.access_token;
@@ -353,7 +353,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const authUrl = `${authBase}/protocol/openid-connect/auth?` + new URLSearchParams({
           client_id: clientId,
           response_type: 'code',
-          scope: 'openid profile email',
+          scope: 'openid profile email offline_access',
           redirect_uri: callbackUrl,
           code_challenge: codeChallenge,
           code_challenge_method: 'S256',

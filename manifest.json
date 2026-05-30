@@ -1,9 +1,9 @@
 {
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwavhrodOcZjHJMjXs+0AB9SQfQjScQE8U5co4tZMBRWuYU3+a4dDtK2LYRgYIOQjfCy3rJNazhgRS4ur0Se+LvtwlEZO69vrY+68BnFrb3Y6erac8HafIRcafA9Frlg3U2wz0wp4D2HKMxSzLuY6R6crc2HnH1UnmA/kej7DbVlcNheRPI0VxsxsUlu0GcZT166Db5ia2vouyRj0SlF2JeFPSk/Zq9wNhCVLbvHVvOv0i++2Z+kx93WSq41BStStbJp0NP91HYGkpv+NFSMbsAZUjIR+v03CMo1VzjtMqyhUrEklZ1Qu7bQJOyufG9ruUqfZ77s1M11gvCgnKH6AQwIDAQAB",
   "manifest_version": 3,
-  "name": "MirAI Recorder",
+  "name": "IAssistant-Direct (by Mirai)",
   "version": "1.2.2",
-  "description": "MirAI Recorder – capture, enregistrement et intégration sécurisée des réunions (Chrome/Firefox, Manifest V2/V3).",
+  "description": "IAssistant-Direct (by Mirai) – capture, enregistrement et intégration sécurisée des réunions (Chrome/Firefox, Manifest V2/V3).",
 
   "icons": {
     "16": "icons/icon16.png",
