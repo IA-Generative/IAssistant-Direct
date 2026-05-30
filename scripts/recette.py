@@ -112,9 +112,11 @@ def check_config(base, slug, profile, expect_realm):
         record(f"Config servie (profile={profile})", "PASS",
                f"schema_v{j.get('meta', {}).get('schema_version')}")
         cfg = j.get("config", {})
-        # Champs requis non vides et sans placeholders ${{...}}
-        required = ["keycloakIssuerUrl", "keycloakRealm", "keycloakClientId",
-                    "bootstrap_url", "relayAssistantBaseUrl", "apiBase"]
+        # Champs requis non vides et sans placeholders ${{...}}.
+        # bootstrap_url est une valeur de BUILD (connue de l'extension), pas servie
+        # par le profil generique `prod` ; relayAssistantBaseUrl est vestigial
+        # (Keycloak/API en direct) -> aucun des deux n'est requis dans la config servie.
+        required = ["keycloakIssuerUrl", "keycloakRealm", "keycloakClientId", "apiBase"]
         missing = [k for k in required if not cfg.get(k)]
         placeholders = [k for k in required
                         if isinstance(cfg.get(k), str) and "${{" in cfg.get(k)]
