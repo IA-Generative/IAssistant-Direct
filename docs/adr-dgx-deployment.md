@@ -50,7 +50,7 @@ Les services externes concernes : Keycloak SSO (`sso.mirai.interieur.gouv.fr`), 
 Deux profils de configuration (`prod-scaleway`, `prod-dgx`) dans `src/dm/config.json`.
 Les scripts `build.sh` et `deploy-release.sh` acceptent un flag `--target=dgx|scaleway`
 qui patche `activeProfile`, les fallbacks hardcodes (`bootstrap.js`, `background.js`)
-et suffixe les artefacts (`mirai-browser-1.2.2-dgx.crx`).
+et suffixe les artefacts (`mirai-browser-1.2.3-dgx.crx`).
 
 Les **sources git ne sont jamais modifiees** par le build — seules les copies dans `dist/`
 sont patchees. Un build par defaut (sans flag) produit la cible Scaleway.
@@ -140,10 +140,10 @@ Scaleway, jamais les deux.
 scripts/build.sh --target=dgx --crx --xpi
 
 # Verifier la config embarquee
-unzip -p dist/mirai-browser-1.2.2-dgx.xpi dm-config.json | python3 -m json.tool
+unzip -p dist/mirai-browser-1.2.3-dgx.xpi dm-config.json | python3 -m json.tool
 
 # Verifier l'icone dans le zip
-unzip -l dist/mirai-browser-1.2.2-dgx.crx | grep assets/
+unzip -l dist/mirai-browser-1.2.3-dgx.crx | grep assets/
 
 # Build Scaleway
 scripts/build.sh --target=scaleway --crx --xpi

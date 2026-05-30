@@ -42,6 +42,17 @@
   },
   "changelog": [
     {
+      "version": "1.2.3",
+      "date": "2026-05-30",
+      "changes": [
+        "Renommage : IAssistant-Direct (by Mirai)",
+        "Session longue duree : offline token Keycloak (pas de re-login ~6 mois) + token chiffre au repos",
+        "DGX en acces direct Keycloak/mcr ; config runtime servie sous ?profile=prod",
+        "Support des 2 URLs COMU (internet comu.gouv.fr + intranet comu.din.gouv.fr)",
+        "Overlay : wizard d'onboarding qui invite a se connecter quand le plug-in n'est pas active"
+      ]
+    },
+    {
       "version": "1.2.2",
       "date": "2026-04-02",
       "changes": [

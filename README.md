@@ -1,4 +1,4 @@
-# IAssistant-Direct (by Mirai) — v1.2.2
+# IAssistant-Direct (by Mirai) — v1.2.3
 
 > Slug technique / device : `mirai-browser`
 
@@ -15,7 +15,7 @@ pour brancher de nouvelles actions assistees sur d'autres applications metier, s
 re-developper l'enrolement, l'auth ni la distribution. La capture de reunions est
 la premiere de ces actions.
 
-## Nouveautes v1.2.2
+## Nouveautes v1.2.3
 
 - Renommage du nom visible : **IAssistant-Direct (by Mirai)** (slug `mirai-browser` inchange)
 - **Session longue duree** : offline token Keycloak (`offline_access`) — pas de re-login pendant ~6 mois
@@ -108,13 +108,13 @@ Les builds sont **parametres par cible de deploiement** via `--target=scaleway|d
 ```bash
 # Scaleway (cloud, defaut)
 scripts/build.sh --target=scaleway --crx --xpi
-# -> dist/mirai-browser-1.2.2-scaleway.crx
-# -> dist/mirai-browser-1.2.2-scaleway.xpi
+# -> dist/mirai-browser-1.2.3-scaleway.crx
+# -> dist/mirai-browser-1.2.3-scaleway.xpi
 
 # DGX (on-premise onyxia.gpu.minint.fr)
 scripts/build.sh --target=dgx --crx --xpi
-# -> dist/mirai-browser-1.2.2-dgx.crx
-# -> dist/mirai-browser-1.2.2-dgx.xpi
+# -> dist/mirai-browser-1.2.3-dgx.crx
+# -> dist/mirai-browser-1.2.3-dgx.xpi
 
 scripts/build.sh --target=dgx         # extension non empaquetee uniquement
 ```

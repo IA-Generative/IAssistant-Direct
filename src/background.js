@@ -261,6 +261,19 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Overlay: check auth status (non-interactive — refresh si expire, sinon authed:false)
+  if (msg?.type === 'overlay:checkAuth') {
+    (async () => {
+      try {
+        await _ensureTokenFresh();
+        sendResponse({ authed: true });
+      } catch (e) {
+        sendResponse({ authed: false });
+      }
+    })();
+    return true;
+  }
+
   // Overlay: check if a recording is active for this platform/url via API
   if (msg?.type === 'overlay:checkActive') {
     (async () => {

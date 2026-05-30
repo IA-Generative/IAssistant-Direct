@@ -122,7 +122,7 @@ describe('dm/manifest.json', () => {
 
   test('a un changelog avec la version courante', () => {
     expect(manifest.changelog.length).toBeGreaterThanOrEqual(1);
-    expect(manifest.changelog[0].version).toBe('1.2.2');
+    expect(manifest.changelog[0].version).toBe('1.2.3');
   });
 
   test('a les key_features', () => {

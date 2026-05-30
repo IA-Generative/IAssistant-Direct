@@ -33,7 +33,7 @@ import urllib.error
 
 # ── Attentes par défaut (alignées sur manifest.json / src/dm/manifest.json) ──
 DEFAULT_SLUG = "mirai-browser"
-DEFAULT_VERSION = "1.2.2"
+DEFAULT_VERSION = "1.2.3"
 DEFAULT_NAME = "IAssistant-Direct (by Mirai)"
 DEFAULT_REALM = "mirai"
 

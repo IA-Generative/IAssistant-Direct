@@ -52,7 +52,7 @@ flux Internet ne sont demandés.**
 | Nom visible | `IAssistant-Direct (by Mirai)` |
 | Extension ID (Chromium/Edge) | `cjaokgcdmdeakhkplbifninjcdklhokf` |
 | Gecko ID (Firefox ESR) | `mirai-assistant@interieur.gouv.fr` |
-| Version | 1.2.2 |
+| Version | 1.2.3 |
 | Signature | CRX signé avec la clé PEM interne (DTNUM) — ID stable |
 
 ### URLs du DM (à utiliser dans la policy)
@@ -68,8 +68,8 @@ flux Internet ne sont demandés.**
 | **Définitive** | `https://device-manager.mirai.interieur.rie.gouv.fr/bootstrap` | `https://device-manager.mirai.interieur.rie.gouv.fr/bootstrap/updates/mirai-browser-dgx.xml` | `https://device-manager.mirai.interieur.rie.gouv.fr/bootstrap/updates/mirai-browser-dgx.json` |
 
 CRX téléchargé automatiquement par le navigateur via le manifeste d'update :
-`<base>/releases/mirai-browser-1.2.2-dgx.crx` (Chromium) /
-`<base>/releases/mirai-browser-1.2.2-dgx.xpi` (Firefox).
+`<base>/releases/mirai-browser-1.2.3-dgx.crx` (Chromium) /
+`<base>/releases/mirai-browser-1.2.3-dgx.xpi` (Firefox).
 
 ---
 
@@ -116,7 +116,7 @@ Mêmes valeurs, sous l'espace de noms Edge :
     "ExtensionSettings": {
       "mirai-assistant@interieur.gouv.fr": {
         "installation_mode": "force_installed",
-        "install_url": "https://onyxia.gpu.minint.fr/bootstrap/releases/mirai-browser-1.2.2-dgx.xpi"
+        "install_url": "https://onyxia.gpu.minint.fr/bootstrap/releases/mirai-browser-1.2.3-dgx.xpi"
       }
     }
   }
@@ -164,7 +164,7 @@ Mêmes valeurs, sous l'espace de noms Edge :
   ```
   `install_url` Firefox ESR après bascule :
   ```
-  https://device-manager.mirai.interieur.rie.gouv.fr/bootstrap/releases/mirai-browser-1.2.2-dgx.xpi
+  https://device-manager.mirai.interieur.rie.gouv.fr/bootstrap/releases/mirai-browser-1.2.3-dgx.xpi
   ```
 - **Rollback** : retirer l'entrée `ExtensionInstallForcelist` / `ExtensionSettings`
   → désinstallation automatique.

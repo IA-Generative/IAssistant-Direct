@@ -10,7 +10,7 @@ accompagné du fichier **`scripts/recette.py`** (autonome, stdlib Python uniquem
 > Tu interviens sur le cluster Kubernetes **air-gap du DGX** (`onyxia.gpu.minint.fr`),
 > namespace du Device Management (probablement `bootstrap` — vérifie avec
 > `kubectl get ns`). Le plug-in navigateur **IAssistant-Direct (by Mirai)**
-> (slug technique `mirai-browser`, v1.2.2, device `chrome`) doit être validé
+> (slug technique `mirai-browser`, v1.2.3, device `chrome`) doit être validé
 > avant ouverture de la beta aux ambassadeurs.
 >
 > Tu disposes du script de recette `recette.py` (joint). Les pods n'ont pas
@@ -76,7 +76,7 @@ si le pod le joint, sinon le chemin serveur via `wireguard-proxy`.
 
 1. Santé service DM (`/healthz`, db)
 2. Présence du plug-in `mirai-browser` au catalogue (device chrome)
-3. Version publiée == 1.2.2
+3. Version publiée == 1.2.3
 4. Nom visible == `IAssistant-Direct (by Mirai)`
 5. Config servie (schema_v2) + champs requis résolus (pas de placeholder `${{...}}`)
 6. `keycloakRealm` == attendu (WARN seulement)
