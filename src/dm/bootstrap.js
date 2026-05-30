@@ -1,8 +1,10 @@
 // dm/bootstrap.js — Device Management bootstrap client
-// Loaded via <script> in popup.html and options.html
+// Loaded via <script> in popup.html / options.html ET via importScripts dans le
+// service worker (background.js). Exposé sur globalThis pour couvrir window
+// (popup/options) ET self (service worker).
 // Config convention aligned with AssistantMiraiLibreOffice (snake_case keys)
 
-window.DMBootstrap = {
+globalThis.DMBootstrap = {
   _configCache: null,
   _localConfig: null,
 

@@ -3,6 +3,8 @@ const api = typeof browser !== 'undefined' ? browser : chrome;
 
 // Import crypto.js (TokenStore) FIRST — recording.js et les handlers token en dépendent.
 try { importScripts('crypto.js'); } catch (e) { console.warn('[MirAI] importScripts crypto.js:', e.message); }
+// Import DMBootstrap (client config DM) — source unique de la config (issuer/realm…)
+try { importScripts('dm/bootstrap.js'); } catch (e) { console.warn('[MirAI] importScripts bootstrap.js:', e.message); }
 // Import recording.js functions (shared with popup)
 try { importScripts('recording.js'); } catch (e) { console.warn('[MirAI] importScripts recording.js:', e.message); }
 
@@ -49,10 +51,13 @@ api.alarms.onAlarm.addListener(async (alarm) => {
 
     if (resp.ok) {
       const config = await resp.json();
-      await api.storage.local.set({ dmConfig: config, dmConfigLastFetch: Date.now() });
+      // Stocke la config APLATIE (keycloak* au top-level), cohérent avec bootstrap.js
+      // et avec ce que lisent overlay:pkceLogin / _ensureTokenFresh / DMBootstrap.
+      const flat = config.config || config;
+      await api.storage.local.set({ dmConfig: flat, dmConfigLastFetch: Date.now() });
       console.info('[MirAI DM] Config refreshed from DM.');
 
-      // Check for update directive
+      // Directive d'update lue sur l'objet brut (sibling de `config`)
       if (config.update && config.update.action === 'update') {
         const currentVersion = manifest.version;
         if (config.update.target_version && config.update.target_version !== currentVersion) {
@@ -60,7 +65,7 @@ api.alarms.onAlarm.addListener(async (alarm) => {
             type: 'basic',
             iconUrl: 'icons/icon128.png',
             title: 'Mise a jour disponible',
-            message: `MirAI Recorder ${config.update.target_version} est disponible.`
+            message: `IAssistant-Direct (by Mirai) ${config.update.target_version} est disponible.`
           });
           await api.storage.local.set({ dmUpdateAvailable: config.update });
         }
@@ -85,11 +90,10 @@ async function _ensureTokenFresh() {
 
   if (miraiToken.expires_in < Date.now() && miraiToken.refresh_token) {
     console.info('[MirAI] Token expired, refreshing...');
-    const { dmConfig } = await api.storage.local.get({ dmConfig: null });
-    const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr').replace(/\/+$/, '');
-    // Realm must NOT fall back to 'mirai' when explicitly empty (DGX relay
-    // exposes /keycloak/protocol/... without a realm segment in the path;
-    // the real realm is injected server-side via RELAY_KEYCLOAK_UPSTREAM).
+    // Config via DMBootstrap (cache/local/fallback — tous avec realm).
+    let dmConfig = {};
+    try { dmConfig = DMBootstrap.getConfig(); } catch (_) {}
+    const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr/realms/mirai').replace(/\/+$/, '');
     const realm = dmConfig?.keycloakRealm;
     const clientId = dmConfig?.keycloakClientId || 'mirai-extension';
     let tokenUrl = issuerUrl;
@@ -341,13 +345,16 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'overlay:pkceLogin') {
     (async () => {
       try {
-        const { dmConfig } = await api.storage.local.get({ dmConfig: null });
-        const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr').replace(/\/+$/, '');
-        // Realm must NOT fall back to 'mirai' when explicitly empty (DGX relay
-        // exposes /keycloak/protocol/... without a realm segment in the path;
-        // the real realm is injected server-side via RELAY_KEYCLOAK_UPSTREAM).
+        // Config via DMBootstrap (MÊME source que le popup) — issuer/realm fiables :
+        // fetch DM si possible, sinon config locale bakée, sinon fallback (tous avec realm).
+        let dmConfig = {};
+        try { dmConfig = await DMBootstrap.init(); }
+        catch (_) { try { dmConfig = DMBootstrap.getConfig(); } catch (_2) {} }
+        const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr/realms/mirai').replace(/\/+$/, '');
         const realm = dmConfig?.keycloakRealm;
         const clientId = dmConfig?.keycloakClientId || 'mirai-extension';
+        // issuer servi (= sso.mirai sans /realms) + realm -> ajoute /realms/{realm} ;
+        // issuer fallback contient déjà /realms/mirai -> laissé tel quel.
         let authBase = issuerUrl;
         if (!issuerUrl.includes('/realms/') && realm) {
           authBase = `${issuerUrl}/realms/${realm}`;
