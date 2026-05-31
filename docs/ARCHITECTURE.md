@@ -23,7 +23,7 @@ première de ces actions.
 
 ```
  ┌─────────────────────── Poste utilisateur (navigateur) ───────────────────────┐
- │  Extension MV3 « IAssistant-Direct (by Mirai) » (slug mirai-browser)          │
+ │  Extension MV3 « IAssistant-Direct (by Mirai) » (slug iassistant-direct-browser) │
  │   • overlay.js    content script sur les pages visio → bouton REC + wizard    │
  │   • popup / options                                                           │
  │   • welcome.html  page de bienvenue (1er lancement)                           │
@@ -56,8 +56,9 @@ première de ces actions.
 
 ## 3. Flux clés
 
-1. **Config** — l'extension demande `GET {bootstrap_url}/config/mirai-browser/config.json?profile=prod`.
-   Chaque DM **résout ses propres valeurs d'environnement** (placeholders `${{…}}`).
+1. **Config** — l'extension demande `GET {bootstrap_url}/config/iassistant-direct-browser/config.json?profile=prod`.
+   Chaque DM **résout ses propres valeurs d'environnement** (placeholders `${{…}}` du template
+   `src/dm/dm-config.json`). Modèle détaillé : [`adr-plugin-dm-integration.md`](adr-plugin-dm-integration.md).
    Source unique côté client : `DMBootstrap` (popup **et** service worker).
 2. **Auth / session** — PKCE (S256) dans un onglet normal → access token + **offline
    token** (scope `offline_access`) → **refresh silencieux sans re-login ~6 mois** →

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# register-dm.sh — Enregistre le plugin mirai-browser dans le Device Management
+# register-dm.sh — Enregistre le plugin iassistant-direct-browser dans le Device Management
 #
 # Usage:
 #   scripts/register-dm.sh                         → DM local (localhost:3001)
@@ -7,15 +7,16 @@
 #
 # Prerequis:
 #   - Le serveur DM doit etre accessible
-#   - Les fichiers src/dm/manifest.json et src/dm/config.json doivent exister
-#   - Optionnel: dist/mirai-browser-*.crx pour upload du binaire
+#   - Les fichiers src/dm/manifest.json et src/dm/dm-config.json doivent exister
+#   - Optionnel: dist/iassistant-direct-browser-*.crx pour upload du binaire
 
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DM_URL="${DM_URL:-http://localhost:3001}"
 MANIFEST="$ROOT_DIR/src/dm/manifest.json"
-CONFIG="$ROOT_DIR/src/dm/config.json"
+# config_template = le TEMPLATE DM (placeholders ${{...}}), PAS la config bakee client.
+CONFIG="$ROOT_DIR/src/dm/dm-config.json"
 
 [ -f "$MANIFEST" ] || { echo "ERREUR: $MANIFEST introuvable"; exit 1; }
 [ -f "$CONFIG" ] || { echo "ERREUR: $CONFIG introuvable"; exit 1; }
@@ -138,10 +139,10 @@ if [[ "$RESPONSE" == *"ERROR"* ]]; then
   echo "   Intent       : (copier depuis src/dm/manifest.json)"
   echo ""
   echo "3. Dans le champ 'Config template', coller le contenu de :"
-  echo "   src/dm/config.json"
+  echo "   src/dm/dm-config.json"
   echo ""
   echo "4. Optionnel — uploader le binaire :"
-  CRX=$(ls "$ROOT_DIR/dist/mirai-browser-"*.crx 2>/dev/null | head -1)
+  CRX=$(ls "$ROOT_DIR/dist/iassistant-direct-browser-"*.crx 2>/dev/null | head -1)
   if [ -n "$CRX" ]; then
     echo "   $CRX"
   else

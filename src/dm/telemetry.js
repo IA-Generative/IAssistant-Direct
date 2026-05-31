@@ -4,7 +4,7 @@
 window.DMTelemetry = {
   _endpoint: null,
   _token: null,
-  _slug: 'mirai-browser',
+  _slug: 'iassistant-direct-browser',
   _buffer: [],
   _flushTimer: null,
   _enabled: false,

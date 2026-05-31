@@ -51,8 +51,12 @@ describe('dm/config.json', () => {
   });
 
   test('contient slug et activeProfile', () => {
-    expect(config.slug).toBe('mirai-browser');
+    expect(config.slug).toBe('iassistant-direct-browser');
     expect(config.activeProfile).toBeDefined();
+  });
+
+  test('config bakee : aucun placeholder ${{}} (les placeholders vivent dans dm-config.json)', () => {
+    expect(JSON.stringify(config)).not.toContain('${{');
   });
 
   test('profil int contient toutes les URLs attendues', () => {
@@ -60,8 +64,6 @@ describe('dm/config.json', () => {
     expect(config.int.keycloakRealm).toBeDefined();
     expect(config.int.keycloakClientId).toBeDefined();
     expect(config.int.apiBase).toBe('https://compte-rendu.mirai.interieur.gouv.fr/api');
-    expect(config.int.chatUrl).toBeDefined();
-    expect(config.int.resumeUrl).toBeDefined();
     expect(config.int.compteRenduUrl).toBeDefined();
     expect(config.int.comuUrl).toBeDefined();
   });
@@ -85,8 +87,9 @@ describe('dm/config.json', () => {
   test('le config_path des profils prod pointe sur ?profile=prod (resolu par chaque DM)', () => {
     expect(config['prod-dgx'].config_path).toContain('profile=prod');
     expect(config['prod-scaleway'].config_path).toContain('profile=prod');
-    // Profil generique servi au runtime, avec placeholders resolus cote DM.
-    expect(config.prod.keycloakIssuerUrl).toBe('${{KEYCLOAK_ISSUER_URL}}');
+    // Config BAKEE : le profil generique prod porte une vraie valeur (fallback hors-ligne) ;
+    // les placeholders ${{}} resolus cote DM vivent dans src/dm/dm-config.json (template).
+    expect(config.prod.keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
     expect(config.prod.relayAssistantBaseUrl).toBeUndefined();
   });
 
@@ -109,11 +112,39 @@ describe('dm/config.json', () => {
   });
 });
 
+describe('dm/dm-config.json (template DM)', () => {
+  const tpl = readSrcJSON('dm/dm-config.json');
+  const ENV_KEYS = ['keycloakIssuerUrl', 'keycloakRealm', 'keycloakClientId',
+    'keycloak_redirect_uri', 'keycloak_allowed_redirect_uri', 'apiBase'];
+
+  test('a le bon slug et configVersion', () => {
+    expect(tpl.slug).toBe('iassistant-direct-browser');
+    expect(tpl.configVersion).toBe(1);
+  });
+
+  test('chaque cle env des profils non-default est un placeholder ${{}}', () => {
+    for (const [prof, val] of Object.entries(tpl)) {
+      if (['configVersion', 'slug', '_description', 'default'].includes(prof)) continue;
+      if (typeof val !== 'object') continue;
+      for (const k of ENV_KEYS) {
+        if (val[k] === undefined) continue;
+        expect(val[k]).toMatch(/^\$\{\{.+\}\}$/);
+      }
+    }
+  });
+
+  test('keycloakClientId est ${{KEYCLOAK_CLIENT_ID}} dans tous les profils', () => {
+    for (const prof of ['dev', 'int', 'prod']) {
+      expect(tpl[prof].keycloakClientId).toBe('${{KEYCLOAK_CLIENT_ID}}');
+    }
+  });
+});
+
 describe('dm/manifest.json', () => {
   const manifest = readSrcJSON('dm/manifest.json');
 
-  test('a le slug mirai-browser', () => {
-    expect(manifest.slug).toBe('mirai-browser');
+  test('a le slug iassistant-direct-browser', () => {
+    expect(manifest.slug).toBe('iassistant-direct-browser');
   });
 
   test('a le device_type chrome', () => {
@@ -122,7 +153,7 @@ describe('dm/manifest.json', () => {
 
   test('a un changelog avec la version courante', () => {
     expect(manifest.changelog.length).toBeGreaterThanOrEqual(1);
-    expect(manifest.changelog[0].version).toBe('1.2.3');
+    expect(manifest.changelog[0].version).toBe('1.2.4');
   });
 
   test('a les key_features', () => {

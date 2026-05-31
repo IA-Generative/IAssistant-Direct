@@ -11,15 +11,12 @@ globalThis.DMBootstrap = {
   // Hardcoded fallback (= profil "prod")
   _fallbackConfig: {
     bootstrap_url: 'https://bootstrap.fake-domain.name',
-    config_path: '/config/mirai-browser/config.json?profile=prod',
+    config_path: '/config/iassistant-direct-browser/config.json?profile=prod',
     keycloakIssuerUrl: 'https://sso.mirai.interieur.gouv.fr/realms/mirai',
     keycloakRealm: 'mirai',
-    keycloakClientId: 'bootstrap-iassistant',
+    keycloakClientId: 'mirai-extension',
     apiBase: 'https://compte-rendu.mirai.interieur.gouv.fr/api',
-    chatUrl: 'https://chat.mirai.interieur.gouv.fr/',
-    resumeUrl: 'https://resume.mirai.interieur.gouv.fr/',
     compteRenduUrl: 'https://compte-rendu.mirai.interieur.gouv.fr/',
-    aideUrl: 'https://mirai.interieur.gouv.fr/aide',
     comuUrl: 'https://webconf.comu.gouv.fr/',
     portal_url: 'https://mirai.interieur.gouv.fr',
     allowedKeywords: ['webconf', 'visio', 'comu', 'webinaire', 'webex', 'gmeet', 'teams'],
@@ -42,7 +39,7 @@ globalThis.DMBootstrap = {
         const raw = JSON.parse(xhr.responseText);
         const profile = raw.activeProfile || 'int';
         const merged = Object.assign({}, raw.default || {}, raw[profile] || {});
-        merged._slug = raw.slug || 'mirai-browser';
+        merged._slug = raw.slug || 'iassistant-direct-browser';
         merged._profile = profile;
         this._localConfig = merged;
         return merged;
@@ -55,7 +52,7 @@ globalThis.DMBootstrap = {
 
   getSlug() {
     const local = this._readLocalConfig();
-    return (local && local._slug) || 'mirai-browser';
+    return (local && local._slug) || 'iassistant-direct-browser';
   },
 
   getProfile() {

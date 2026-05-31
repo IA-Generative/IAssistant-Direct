@@ -48,7 +48,7 @@ api.alarms.onAlarm.addListener(async (alarm) => {
 
     // Read DM params from cached config (set by bootstrap.js at popup init)
     const bootstrapUrl = cachedConfig?.bootstrap_url || 'https://bootstrap.fake-domain.name';
-    const configPath = cachedConfig?.config_path || '/config/mirai-browser/config.json?profile=int';
+    const configPath = cachedConfig?.config_path || '/config/iassistant-direct-browser/config.json?profile=int';
 
     const resp = await fetch(`${bootstrapUrl}${configPath}`, {
       headers: {

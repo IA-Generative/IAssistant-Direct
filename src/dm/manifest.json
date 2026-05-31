@@ -1,5 +1,5 @@
 {
-  "slug": "mirai-browser",
+  "slug": "iassistant-direct-browser",
   "name": "IAssistant-Direct (by Mirai)",
   "description": "Capture et retranscription automatique de reunions en ligne (Webconf, Visio, COMU, Webinaire, Webex, GMeet, Teams).",
   "intent": "Permettre aux agents de capturer et transcrire automatiquement leurs reunions en ligne.",
@@ -41,6 +41,17 @@
     "support": "En cas de probleme persistant, contactez fabrique-numerique@interieur.gouv.fr"
   },
   "changelog": [
+    {
+      "version": "1.2.4",
+      "date": "2026-05-31",
+      "changes": [
+        "Slug technique renomme : mirai-browser -> iassistant-direct-browser (migration DM dual-serve, Extension ID inchange)",
+        "Config DM separee en 2 artefacts : template src/dm/dm-config.json (placeholders ${{...}} resolus cote DM) + config bakee client src/dm/config.json (vraies valeurs, fallback hors-ligne)",
+        "Suppression des cles mortes chatUrl/resumeUrl/aideUrl ; keycloak_redirect_uri retire du bake (calcule via chrome.identity)",
+        "Client Keycloak fallback aligne sur mirai-extension (corrige les fallbacks bootstrap-iassistant heritages)",
+        "ADR docs/adr-plugin-dm-integration.md : modele d'integration plugin <-> DM"
+      ]
+    },
     {
       "version": "1.2.3",
       "date": "2026-05-30",

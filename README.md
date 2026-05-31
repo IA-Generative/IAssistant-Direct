@@ -1,6 +1,6 @@
-# IAssistant-Direct (by Mirai) — v1.2.3
+# IAssistant-Direct (by Mirai) — v1.2.4
 
-> Slug technique / device : `mirai-browser`
+> Slug technique / device : `iassistant-direct-browser` (ex-`mirai-browser`, renomme en v1.2.4)
 
 Extension Chrome/Firefox pour capturer et transcrire automatiquement les reunions
 en ligne.
@@ -22,9 +22,17 @@ la premiere de ces actions.
 enseignements (composants, flux, environnements, prérequis Keycloak/réseau/poste,
 redondance multi-région, pièges rencontrés).
 
+## Nouveautes v1.2.4
+
+- **Slug technique renomme** : `mirai-browser` -> `iassistant-direct-browser` (migration DM
+  dual-serve, Extension ID inchange). Voir [`docs/adr-plugin-dm-integration.md`](docs/adr-plugin-dm-integration.md).
+- **Config DM separee** : template `src/dm/dm-config.json` (placeholders resolus cote DM) +
+  config bakee `src/dm/config.json` (vraies valeurs, fallback hors-ligne) ; suppression des
+  cles mortes ; client Keycloak fallback aligne sur `mirai-extension`.
+
 ## Nouveautes v1.2.3
 
-- Renommage du nom visible : **IAssistant-Direct (by Mirai)** (slug `mirai-browser` inchange)
+- Renommage du nom visible : **IAssistant-Direct (by Mirai)**
 - **Session longue duree** : offline token Keycloak (`offline_access`) — pas de re-login pendant ~6 mois
 - **Token chiffre au repos** (AES-GCM via `crypto.js` / `TokenStore`)
 - Overlay flottant sur les pages de visio (draggable, auto-minimize, position memorisee)
@@ -116,13 +124,13 @@ Les builds sont **parametres par cible de deploiement** via `--target=scaleway|d
 ```bash
 # Scaleway (cloud, defaut)
 scripts/build.sh --target=scaleway --crx --xpi
-# -> dist/mirai-browser-1.2.3-scaleway.crx
-# -> dist/mirai-browser-1.2.3-scaleway.xpi
+# -> dist/iassistant-direct-browser-1.2.4-scaleway.crx
+# -> dist/iassistant-direct-browser-1.2.4-scaleway.xpi
 
 # DGX (on-premise onyxia.gpu.minint.fr)
 scripts/build.sh --target=dgx --crx --xpi
-# -> dist/mirai-browser-1.2.3-dgx.crx
-# -> dist/mirai-browser-1.2.3-dgx.xpi
+# -> dist/iassistant-direct-browser-1.2.4-dgx.crx
+# -> dist/iassistant-direct-browser-1.2.4-dgx.xpi
 
 scripts/build.sh --target=dgx         # extension non empaquetee uniquement
 ```

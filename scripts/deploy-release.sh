@@ -9,10 +9,10 @@
 #   --target=dgx                → profile prod-dgx
 #
 # Produces:
-#   - mirai-browser-${VERSION}-${TARGET}.crx   (Chrome, signed with PEM key)
-#   - mirai-browser-${VERSION}-${TARGET}.xpi   (Firefox ESR)
-#   - updates/mirai-browser-${TARGET}.xml  (Chrome auto-update manifest)
-#   - updates/mirai-browser-${TARGET}.json (Firefox auto-update manifest)
+#   - ${SLUG}-${VERSION}-${TARGET}.crx   (Chrome, signed with PEM key)
+#   - ${SLUG}-${VERSION}-${TARGET}.xpi   (Firefox ESR)
+#   - updates/${SLUG}/${TARGET}.xml  (Chrome auto-update manifest)
+#   - updates/${SLUG}/${TARGET}.json (Firefox auto-update manifest)
 #   - Uploads everything to the DM bootstrap server at $BOOTSTRAP_URL
 
 set -euo pipefail
@@ -36,7 +36,7 @@ esac
 # ──────────────────────────────────────────────
 # Configuration
 # ──────────────────────────────────────────────
-SLUG="mirai-browser"
+SLUG="iassistant-direct-browser"
 GECKO_ID="mirai-assistant@interieur.gouv.fr"
 # BOOTSTRAP_URL = where we UPLOAD artefacts (DM server endpoint).
 # Defaults to the target's own bootstrap URL but can be overridden, e.g. to a staging DM.
@@ -72,7 +72,7 @@ echo "Extension ID: $EXTENSION_ID"
 # 1. Prepare clean build directory
 # ──────────────────────────────────────────────
 rm -rf "$BUILD_DIR" "$OUT_DIR"
-mkdir -p "$BUILD_DIR" "$OUT_DIR/updates"
+mkdir -p "$BUILD_DIR" "$OUT_DIR/updates/${SLUG}"
 
 # Copy only what the extension needs
 cp "$EXT_DIR/manifest.json" "$BUILD_DIR/"
@@ -91,8 +91,8 @@ cp "$EXT_DIR/icons/icon128.png" "$BUILD_DIR/assets/icon128.png"
 python3 -c "
 import json
 m = json.load(open('$BUILD_DIR/manifest.json'))
-m['update_url'] = '${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.xml'
-m['browser_specific_settings']['gecko']['update_url'] = '${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.json'
+m['update_url'] = '${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.xml'
+m['browser_specific_settings']['gecko']['update_url'] = '${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.json'
 json.dump(m, open('$BUILD_DIR/manifest.json', 'w'), indent=2, ensure_ascii=False)
 "
 
@@ -182,7 +182,7 @@ echo "  OK  ${SLUG}-${VERSION}-${TARGET}.xpi"
 # ──────────────────────────────────────────────
 # 4. Generate Chrome update manifest (XML)
 # ──────────────────────────────────────────────
-cat > "$OUT_DIR/updates/mirai-browser-${TARGET}.xml" <<XMLEOF
+cat > "$OUT_DIR/updates/${SLUG}/${TARGET}.xml" <<XMLEOF
 <?xml version='1.0' encoding='UTF-8'?>
 <gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
   <app appid='${EXTENSION_ID}'>
@@ -191,12 +191,12 @@ cat > "$OUT_DIR/updates/mirai-browser-${TARGET}.xml" <<XMLEOF
   </app>
 </gupdate>
 XMLEOF
-echo "  OK  updates/mirai-browser-${TARGET}.xml (appid=${EXTENSION_ID})"
+echo "  OK  updates/${SLUG}/${TARGET}.xml (appid=${EXTENSION_ID})"
 
 # ──────────────────────────────────────────────
 # 5. Generate Firefox update manifest (JSON)
 # ──────────────────────────────────────────────
-cat > "$OUT_DIR/updates/mirai-browser-${TARGET}.json" <<JSONEOF
+cat > "$OUT_DIR/updates/${SLUG}/${TARGET}.json" <<JSONEOF
 {
   "addons": {
     "${GECKO_ID}": {
@@ -210,7 +210,7 @@ cat > "$OUT_DIR/updates/mirai-browser-${TARGET}.json" <<JSONEOF
   }
 }
 JSONEOF
-echo "  OK  updates/mirai-browser-${TARGET}.json (gecko=${GECKO_ID})"
+echo "  OK  updates/${SLUG}/${TARGET}.json (gecko=${GECKO_ID})"
 
 # ──────────────────────────────────────────────
 # 6. Deploy to DM bootstrap server
@@ -236,18 +236,18 @@ curl -sf -X PUT "${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.xpi" \
 
 # Upload Chrome update manifest
 echo -n "  Uploading Chrome update manifest... "
-curl -sf -X PUT "${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.xml" \
+curl -sf -X PUT "${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.xml" \
   -H "X-Admin-Token: ${ADMIN_TOKEN}" \
   -H "Content-Type: application/xml" \
-  -T "$OUT_DIR/updates/mirai-browser-${TARGET}.xml" \
+  -T "$OUT_DIR/updates/${SLUG}/${TARGET}.xml" \
   && echo "OK" || echo "FAILED"
 
 # Upload Firefox update manifest
 echo -n "  Uploading Firefox update manifest... "
-curl -sf -X PUT "${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.json" \
+curl -sf -X PUT "${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.json" \
   -H "X-Admin-Token: ${ADMIN_TOKEN}" \
   -H "Content-Type: application/json" \
-  -T "$OUT_DIR/updates/mirai-browser-${TARGET}.json" \
+  -T "$OUT_DIR/updates/${SLUG}/${TARGET}.json" \
   && echo "OK" || echo "FAILED"
 
 # Deploy config (canary strategy)
@@ -275,8 +275,8 @@ echo " Artifacts:"
 ls -lh "$OUT_DIR/"*.crx "$OUT_DIR/"*.xpi 2>/dev/null | awk '{print "   " $NF " (" $5 ")"}'
 echo ""
 echo " Update endpoints:"
-echo "   Chrome : ${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.xml"
-echo "   Firefox: ${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.json"
+echo "   Chrome : ${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.xml"
+echo "   Firefox: ${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.json"
 echo ""
 echo " Download URLs:"
 echo "   CRX: ${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.crx"

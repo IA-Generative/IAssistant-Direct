@@ -100,7 +100,7 @@ describe('background.js', () => {
       await alarmHandler({ name: 'dm-config-refresh' });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/config/mirai-browser/config.json?profile=int'),
+        expect.stringContaining('/config/iassistant-direct-browser/config.json?profile=int'),
         expect.objectContaining({
           headers: expect.objectContaining({
             'X-Plugin-Version': '1.2.1',

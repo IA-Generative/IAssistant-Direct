@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 recette.py — Jeu de recette automatique du plug-in IAssistant-Direct (by Mirai)
-              servi par le Device Management (mirai-browser).
+              servi par le Device Management (iassistant-direct-browser).
 
 Conçu pour être AUTONOME (stdlib uniquement, aucun paquet à installer) afin de
 tourner :
@@ -32,8 +32,8 @@ import urllib.request
 import urllib.error
 
 # ── Attentes par défaut (alignées sur manifest.json / src/dm/manifest.json) ──
-DEFAULT_SLUG = "mirai-browser"
-DEFAULT_VERSION = "1.2.3"
+DEFAULT_SLUG = "iassistant-direct-browser"
+DEFAULT_VERSION = "1.2.4"
 DEFAULT_NAME = "IAssistant-Direct (by Mirai)"
 DEFAULT_REALM = "mirai"
 
@@ -199,8 +199,73 @@ def check_enroll(base, token):
         record("Enrollment DM (E2E)", "FAIL", repr(e)[:140])
 
 
+def _iter_strings(obj):
+    if isinstance(obj, str):
+        yield obj
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            yield from _iter_strings(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _iter_strings(v)
+
+
+def check_local_artifacts(repo_root):
+    """Validation STATIQUE des artefacts du repo (sans réseau, gate CI/build).
+
+    Invariants (voir docs/adr-plugin-dm-integration.md) :
+      - src/dm/config.json (config BAKÉE) : aucune valeur ${{...}} ; clés critiques
+        non vides dans chaque profil.
+      - src/dm/dm-config.json (TEMPLATE DM) : à l'inverse, chaque clé env des profils
+        non-`default` DOIT être un placeholder ${{...}} (résolu côté serveur).
+    """
+    import os
+    if not repo_root:
+        record("Artefacts locaux (baké vs template)", "SKIP", "pas de --repo-root")
+        return
+    baked_path = os.path.join(repo_root, "src", "dm", "config.json")
+    tpl_path = os.path.join(repo_root, "src", "dm", "dm-config.json")
+    crit = ["keycloakIssuerUrl", "keycloakRealm", "keycloakClientId", "apiBase"]
+    meta_keys = ("configVersion", "slug", "activeProfile", "_description", "default")
+
+    # 1. Config bakée : zéro placeholder + clés critiques non vides
+    try:
+        baked = json.load(open(baked_path, encoding="utf-8"))
+        leaks = [s for s in _iter_strings(baked) if "${{" in s]
+        record("Config bakée sans placeholder ${{}}", "PASS" if not leaks else "FAIL",
+               "" if not leaks else f"{len(leaks)} placeholder(s) résiduel(s)")
+        bad = []
+        for prof, val in baked.items():
+            if prof in meta_keys or not isinstance(val, dict):
+                continue
+            bad += [f"{prof}.{k}" for k in crit if not val.get(k)]
+        record("Config bakée : clés critiques non vides", "PASS" if not bad else "FAIL",
+               "" if not bad else f"manquantes={bad[:6]}")
+    except Exception as e:
+        record("Config bakée (lecture)", "FAIL", repr(e)[:140])
+
+    # 2. Template DM : clés env = placeholders ${{}}
+    try:
+        tpl = json.load(open(tpl_path, encoding="utf-8"))
+        env_keys = ["keycloakIssuerUrl", "keycloakRealm", "keycloakClientId",
+                    "keycloak_redirect_uri", "keycloak_allowed_redirect_uri", "apiBase"]
+        nonph = []
+        for prof, val in tpl.items():
+            if prof in meta_keys or not isinstance(val, dict):
+                continue
+            for k in env_keys:
+                v = val.get(k)
+                if v is not None and not (
+                        isinstance(v, str) and v.startswith("${{") and v.endswith("}}")):
+                    nonph.append(f"{prof}.{k}={v!r}")
+        record("Template DM : clés env = placeholders ${{}}", "PASS" if not nonph else "FAIL",
+               "" if not nonph else f"en dur={nonph[:6]}")
+    except Exception as e:
+        record("Template DM (lecture)", "FAIL", repr(e)[:140])
+
+
 def main():
-    ap = argparse.ArgumentParser(description="Recette automatique IAssistant-Direct / mirai-browser")
+    ap = argparse.ArgumentParser(description="Recette automatique IAssistant-Direct / iassistant-direct-browser")
     ap.add_argument("--base", default="http://localhost:3001",
                     help="URL de base du DM (défaut: http://localhost:3001 pour exec in-pod)")
     ap.add_argument("--profile", default="int", help="profil de config (int|prod-dgx|prod-scaleway)")
@@ -216,11 +281,15 @@ def main():
     ap.add_argument("--relay-url", default="",
                     help="URL de base du relay-assistant (override si nom de service différent)")
     ap.add_argument("--token", default="", help="token Keycloak pour le test d'enrollment E2E (optionnel)")
+    ap.add_argument("--repo-root", default="",
+                    help="racine du repo pour valider statiquement src/dm/config.json (baké) "
+                         "et src/dm/dm-config.json (template). Vide => SKIP (préserve l'usage in-cluster).")
     args = ap.parse_args()
 
     print(f"\n=== Recette IAssistant-Direct (by Mirai) — base={args.base} "
           f"profile={args.profile} in_cluster={args.in_cluster} ===\n")
 
+    check_local_artifacts(args.repo_root)
     check_service_health(args.base)
     check_catalog(args.base, args.slug, args.expect_version, args.expect_name)
     check_config(args.base, args.slug, args.profile, args.expect_realm)

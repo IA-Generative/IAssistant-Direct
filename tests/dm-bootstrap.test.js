@@ -18,17 +18,14 @@ describe('DMBootstrap', () => {
       expect(config).toBeDefined();
       expect(config.keycloakIssuerUrl).toBe('https://sso.mirai.interieur.gouv.fr/realms/mirai');
       expect(config.keycloakRealm).toBe('mirai');
-      expect(config.keycloakClientId).toBe('bootstrap-iassistant');
+      expect(config.keycloakClientId).toBe('mirai-extension');
       expect(config.apiBase).toBe('https://compte-rendu.mirai.interieur.gouv.fr/api');
       expect(config.bootstrap_url).toBe('https://bootstrap.fake-domain.name');
     });
 
-    test('contient toutes les URLs de raccourcis', () => {
+    test('contient les URLs de raccourcis actives', () => {
       const config = window.DMBootstrap.getConfig();
-      expect(config.chatUrl).toBe('https://chat.mirai.interieur.gouv.fr/');
-      expect(config.resumeUrl).toBe('https://resume.mirai.interieur.gouv.fr/');
       expect(config.compteRenduUrl).toBe('https://compte-rendu.mirai.interieur.gouv.fr/');
-      expect(config.aideUrl).toBe('https://mirai.interieur.gouv.fr/aide');
       expect(config.comuUrl).toBe('https://webconf.comu.gouv.fr/');
     });
 
@@ -50,17 +47,17 @@ describe('DMBootstrap', () => {
         json: () => Promise.resolve({
           config: {
             apiBase: 'https://custom-api.example.com/api',
-            chatUrl: 'https://custom-chat.example.com/'
+            comuUrl: 'https://custom-comu.example.com/'
           }
         })
       });
 
       const config = await window.DMBootstrap.fetchConfig(
-        'https://bootstrap.test.com', 'mirai-browser', 'int'
+        'https://bootstrap.test.com', 'iassistant-direct-browser', 'int'
       );
 
       expect(config.apiBase).toBe('https://custom-api.example.com/api');
-      expect(config.chatUrl).toBe('https://custom-chat.example.com/');
+      expect(config.comuUrl).toBe('https://custom-comu.example.com/');
       // Non-overridden values stay from fallback
       expect(config.keycloakIssuerUrl).toBe('https://sso.mirai.interieur.gouv.fr/realms/mirai');
       expect(config.keycloakRealm).toBe('mirai');
@@ -75,11 +72,11 @@ describe('DMBootstrap', () => {
         json: () => Promise.resolve({ config: {} })
       });
 
-      await window.DMBootstrap.fetchConfig('https://dm.test', 'mirai-browser', 'int');
+      await window.DMBootstrap.fetchConfig('https://dm.test', 'iassistant-direct-browser', 'int');
 
       const fetchUrl = global.fetch.mock.calls[0][0];
       expect(fetchUrl).toContain('https://dm.test');
-      expect(fetchUrl).toContain('mirai-browser');
+      expect(fetchUrl).toContain('iassistant-direct-browser');
       const headers = global.fetch.mock.calls[0][1].headers;
       expect(headers['X-Plugin-Version']).toBe('1.2.1');
       expect(headers['X-Client-UUID']).toBe('uuid-abc');

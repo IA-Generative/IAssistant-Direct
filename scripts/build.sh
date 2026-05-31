@@ -7,8 +7,8 @@
 #   scripts/build.sh --target=dgx --crx --xpi     → DGX + .crx signe + .xpi
 #
 # Les artefacts sont suffixes par la cible :
-#   dist/mirai-browser-${VERSION}-${TARGET}.crx
-#   dist/mirai-browser-${VERSION}-${TARGET}.xpi
+#   dist/iassistant-direct-browser-${VERSION}-${TARGET}.crx
+#   dist/iassistant-direct-browser-${VERSION}-${TARGET}.xpi
 
 set -euo pipefail
 
@@ -58,7 +58,9 @@ cp -r "$ROOT_DIR/icons/" "$EXT_DIR/icons/"
 # DM files at ZIP root (required by Device Management)
 # DM auto-detects and strips them from the distributed binary
 cp "$ROOT_DIR/src/dm/manifest.json" "$EXT_DIR/dm-manifest.json"
-cp "$ROOT_DIR/src/dm/config.json" "$EXT_DIR/dm-config.json"
+# dm-config.json = TEMPLATE DM (placeholders ${{...}}), uploade comme config_template.
+# A ne pas confondre avec src/dm/config.json (config bakee client, vraies valeurs).
+cp "$ROOT_DIR/src/dm/dm-config.json" "$EXT_DIR/dm-config.json"
 
 # DM icon: convention device-management is to look up basenames
 # {logo.png, icon128.png, icon48.png} inside an assets/ directory at
@@ -79,8 +81,9 @@ import json, re
 profile = "$PROFILE"
 bootstrap_url = "$BOOTSTRAP_URL"
 
-# 1. Patch dm-config.json copies (root + src/dm/)
-for p in ["$EXT_DIR/dm-config.json", "$EXT_DIR/src/dm/config.json"]:
+# 1. Patch activeProfile UNIQUEMENT sur la config bakee client (src/dm/config.json).
+#    Le template DM ($EXT_DIR/dm-config.json) n'a pas d'activeProfile (servi par profil).
+for p in ["$EXT_DIR/src/dm/config.json"]:
     with open(p) as f:
         d = json.load(f)
     d["activeProfile"] = profile
@@ -176,9 +179,9 @@ if [[ " $* " == *" --crx "* ]]; then
   "$CHROME_BIN" --pack-extension="$EXT_DIR" --pack-extension-key="$PEM_KEY" 2>/dev/null || true
 
   if [ -f "${EXT_DIR}.crx" ]; then
-    mv "${EXT_DIR}.crx" "$DIST_DIR/mirai-browser-${VERSION}-${TARGET}.crx"
-    CRX_SIZE=$(du -h "$DIST_DIR/mirai-browser-${VERSION}-${TARGET}.crx" | cut -f1)
-    echo "  OK  dist/mirai-browser-${VERSION}-${TARGET}.crx ($CRX_SIZE)"
+    mv "${EXT_DIR}.crx" "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.crx"
+    CRX_SIZE=$(du -h "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.crx" | cut -f1)
+    echo "  OK  dist/iassistant-direct-browser-${VERSION}-${TARGET}.crx ($CRX_SIZE)"
   else
     echo "  ERREUR: CRX non genere"
   fi
@@ -190,9 +193,9 @@ fi
 if [[ " $* " == *" --xpi "* ]]; then
   echo ""
   echo "Packaging XPI..."
-  (cd "$EXT_DIR" && zip -r -q "$DIST_DIR/mirai-browser-${VERSION}-${TARGET}.xpi" .)
-  XPI_SIZE=$(du -h "$DIST_DIR/mirai-browser-${VERSION}-${TARGET}.xpi" | cut -f1)
-  echo "  OK  dist/mirai-browser-${VERSION}-${TARGET}.xpi ($XPI_SIZE)"
+  (cd "$EXT_DIR" && zip -r -q "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.xpi" .)
+  XPI_SIZE=$(du -h "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.xpi" | cut -f1)
+  echo "  OK  dist/iassistant-direct-browser-${VERSION}-${TARGET}.xpi ($XPI_SIZE)"
 fi
 
 # ──────────────────────────────────────────────
@@ -204,11 +207,12 @@ echo " Build MirAI Recorder v$VERSION (target=$TARGET)"
 echo "========================================="
 echo " dist/extension/                         → extension non empaquetee"
 echo "                                           (chargeable dans chrome://extensions)"
-[ -f "$DIST_DIR/mirai-browser-${VERSION}-${TARGET}.crx" ] && echo " dist/mirai-browser-${VERSION}-${TARGET}.crx → Chrome signe"
-[ -f "$DIST_DIR/mirai-browser-${VERSION}-${TARGET}.xpi" ] && echo " dist/mirai-browser-${VERSION}-${TARGET}.xpi → Firefox"
+[ -f "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.crx" ] && echo " dist/iassistant-direct-browser-${VERSION}-${TARGET}.crx → Chrome signe"
+[ -f "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.xpi" ] && echo " dist/iassistant-direct-browser-${VERSION}-${TARGET}.xpi → Firefox"
 echo ""
 echo " Contenu DM inclus :"
-echo "   src/dm/config.json   → config multi-profils"
+echo "   src/dm/dm-config.json → template DM (placeholders, uploade au catalogue)"
+echo "   src/dm/config.json    → config bakee client (vraies valeurs, fallback)"
 echo "   src/dm/manifest.json → metadata DM"
 echo "   src/dm/bootstrap.js  → client config DM"
 echo "   src/dm/telemetry.js  → telemetrie OTLP"
