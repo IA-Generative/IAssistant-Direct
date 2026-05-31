@@ -15,6 +15,13 @@ pour brancher de nouvelles actions assistees sur d'autres applications metier, s
 re-developper l'enrolement, l'auth ni la distribution. La capture de reunions est
 la premiere de ces actions.
 
+## Architecture & onboarding
+
+**Pour comprendre le système, les prérequis entreprise et l'architecture redondante :
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** — doc d'onboarding qui fédère les
+enseignements (composants, flux, environnements, prérequis Keycloak/réseau/poste,
+redondance multi-région, pièges rencontrés).
+
 ## Nouveautes v1.2.3
 
 - Renommage du nom visible : **IAssistant-Direct (by Mirai)** (slug `mirai-browser` inchange)
@@ -73,6 +80,7 @@ scripts/
   register-dm.sh                     # Enregistrement du plugin dans le DM
   recette.py                         # Jeu de recette automatique (stdlib, in-cluster ou distant)
 docs/
+  ARCHITECTURE.md                    # Architecture, prerequis entreprise, redondance, capitalisation
   adr-dgx-deployment.md              # ADR deploiement on-premise DGX
   keycloak-offline-tokens.md         # Config Keycloak session 6 mois (offline tokens)
   demande-changement-deploiement-navigateur.md  # Demande de changement IT (force-install)
