@@ -82,9 +82,77 @@ const CRYPTO = {
 
 };
 
-if (typeof window !== 'undefined') {
-  window.encrypt = CRYPTO.encrypt.bind(CRYPTO);
-  window.decrypt = CRYPTO.decrypt.bind(CRYPTO);
-  window.CRYPTO = CRYPTO;
-  console.info('[MirAI Crypto] Fonctions globales exposées (encrypt/decrypt).');
+// ──────────────────────────────────────────────────────────────────────────
+// TokenStore — stockage CHIFFRÉ du token SSO (miraiToken) au repos.
+//
+// Le token (offline token Keycloak, durée ~6 mois) ne doit pas rester en clair
+// dans chrome.storage.local. On le chiffre en AES-GCM via CRYPTO, avec une clé
+// dérivée d'un secret aléatoire 256 bits propre à l'appareil (miraiTokenKey),
+// généré une fois et stocké localement. Limite assumée : la clé vit sur le
+// poste — ceci protège contre la sync/inspection/logs, pas contre un accès
+// complet au poste.
+//
+// Utilisé par auth.js (popup/options), background.js (service worker) et
+// recording.js. Accès stockage via l'API brute (chrome/browser) pour être
+// indépendant de compat.js et fonctionner aussi en service worker.
+// ──────────────────────────────────────────────────────────────────────────
+const _TOKEN_KEY = 'miraiToken';
+const _TOKEN_SECRET_KEY = 'miraiTokenKey';
+const _tokenStorage = () =>
+  ((typeof browser !== 'undefined') ? browser : chrome).storage.local;
+
+const TokenStore = {
+  async _getOrCreateSecret() {
+    const store = _tokenStorage();
+    const got = await store.get({ [_TOKEN_SECRET_KEY]: null });
+    let secret = got[_TOKEN_SECRET_KEY];
+    if (!secret) {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      secret = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
+      await store.set({ [_TOKEN_SECRET_KEY]: secret });
+    }
+    return secret;
+  },
+
+  /** Retourne le token déchiffré {access_token, refresh_token, expires_in} ou null. */
+  async getToken() {
+    const got = await _tokenStorage().get({ [_TOKEN_KEY]: null });
+    const raw = got[_TOKEN_KEY];
+    if (!raw) return null;
+    // Paquet chiffré ?
+    if (raw.iv && raw.salt && raw.ciphertext) {
+      const secret = await this._getOrCreateSecret();
+      return await CRYPTO.decryptJSON(raw, secret);
+    }
+    // Ancien token en clair → migration transparente vers le format chiffré.
+    if (raw.access_token) {
+      try { await this.storeToken(raw); } catch (e) {
+        console.warn('[MirAI TokenStore] Migration chiffrée échouée:', e?.message);
+      }
+      return raw;
+    }
+    return null;
+  },
+
+  /** Chiffre puis stocke le token. */
+  async storeToken(tokenData) {
+    const secret = await this._getOrCreateSecret();
+    const packet = await CRYPTO.encryptJSON(tokenData, secret);
+    await _tokenStorage().set({ [_TOKEN_KEY]: packet });
+  },
+
+  /** Supprime le token (révocation locale). Conserve le secret de chiffrement. */
+  async clearToken() {
+    await _tokenStorage().remove(_TOKEN_KEY);
+  }
+};
+
+// Exposition globale — sur globalThis pour couvrir window (popup/options) ET
+// self (service worker background.js).
+if (typeof globalThis !== 'undefined') {
+  globalThis.encrypt = CRYPTO.encrypt.bind(CRYPTO);
+  globalThis.decrypt = CRYPTO.decrypt.bind(CRYPTO);
+  globalThis.CRYPTO = CRYPTO;
+  globalThis.TokenStore = TokenStore;
+  console.info('[MirAI Crypto] Fonctions globales exposées (encrypt/decrypt/TokenStore).');
 }

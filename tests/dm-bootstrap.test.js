@@ -35,7 +35,7 @@ describe('DMBootstrap', () => {
     test('contient les allowedKeywords', () => {
       const config = window.DMBootstrap.getConfig();
       expect(config.allowedKeywords).toEqual(
-        ['webconf', 'comu', 'webinaire', 'webex', 'gmeet', 'teams']
+        ['webconf', 'visio', 'comu', 'webinaire', 'webex', 'gmeet', 'teams']
       );
     });
   });

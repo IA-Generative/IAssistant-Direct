@@ -1,4 +1,4 @@
-# Guide de test complet — MirAI Recorder
+# Guide de test complet — IAssistant-Direct (by Mirai)
 
 ## Vue d'ensemble
 
@@ -63,14 +63,14 @@ beforeEach(() => {
 ### 2.2 Methode A — Chromium via VSCode (automatique)
 
 1. Ouvrir le projet dans VSCode
-2. **Run & Debug** (Ctrl+Shift+D) → **"Debug MirAI Recorder (Chromium)"**
+2. **Run & Debug** (Ctrl+Shift+D) → **"Debug IAssistant-Direct (by Mirai) — (Chromium)"**
 3. Appuyer sur **F5**
 4. Chromium s'ouvre avec l'extension chargee automatiquement
 5. L'icone MirAI apparait dans la barre d'outils
 
 ### 2.3 Methode B — Chrome stable (chargement manuel)
 
-1. **Run & Debug** → **"Debug MirAI Recorder (Chrome — manual load)"**
+1. **Run & Debug** → **"Debug IAssistant-Direct (by Mirai) — (Chrome — manual load)"**
 2. **F5** → Chrome s'ouvre sur `chrome://extensions`
 3. Activer le **Mode developpeur** (toggle en haut a droite)
 4. Cliquer **"Charger l'extension non empaquetee"**
@@ -79,7 +79,7 @@ beforeEach(() => {
 
 ### 2.4 Methode C — Firefox ESR
 
-1. **Run & Debug** → **"Debug MirAI Recorder (Firefox ESR)"**
+1. **Run & Debug** → **"Debug IAssistant-Direct (by Mirai) — (Firefox ESR)"**
 2. **F5** → Firefox s'ouvre
 3. L'extension est chargee temporairement (perdue a la fermeture)
 

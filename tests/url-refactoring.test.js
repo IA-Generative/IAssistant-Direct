@@ -9,7 +9,9 @@ const readFile = (name) => fs.readFileSync(path.join(__dirname, '..', 'src', nam
 describe('URL refactoring — recording.js', () => {
   test('API_BASE utilise DMBootstrap avec fallback', () => {
     const code = readFile('recording.js');
-    expect(code).toContain('window.DMBootstrap?.getConfig()?.apiBase');
+    // recording.js runs in both popup (window) and service worker (self),
+    // so the lookup goes through a _global alias instead of window directly.
+    expect(code).toContain('.DMBootstrap?.getConfig()?.apiBase');
     expect(code).toContain("|| 'https://compte-rendu.mirai.interieur.gouv.fr/api'");
   });
 

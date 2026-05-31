@@ -1,6 +1,6 @@
 {
   "slug": "mirai-browser",
-  "name": "MirAI Browser",
+  "name": "IAssistant-Direct (by Mirai)",
   "description": "Capture et retranscription automatique de reunions en ligne (Webconf, Visio, COMU, Webinaire, Webex, GMeet, Teams).",
   "intent": "Permettre aux agents de capturer et transcrire automatiquement leurs reunions en ligne.",
   "device_type": "chrome",
@@ -23,7 +23,7 @@
     "Enrollment et relay via Device Management"
   ],
   "install_instructions": {
-    "title": "Installer MirAI Recorder sur Chromium ou Microsoft Edge",
+    "title": "Installer IAssistant-Direct (by Mirai) sur Chromium ou Microsoft Edge",
     "intro": "Aucun droit administrateur n'est necessaire. L'installation prend moins d'une minute.",
     "steps": [
       "Telechargez le fichier .crx depuis ce catalogue et enregistrez-le (par defaut dans votre dossier Telechargements).",
@@ -36,11 +36,22 @@
     "troubleshooting": [
       "Si le fichier .crx ne se depose pas : verifiez que le 'Mode developpeur' est bien active.",
       "Si un message indique que les extensions ne peuvent venir que du Chrome Web Store : votre navigateur est en version bridee. Demandez a votre referent informatique de vous fournir une version Chromium ou Edge permettant les extensions hors-store.",
-      "Si l'icone MirAI n'apparait pas : cliquez sur la piece de puzzle a droite de la barre d'adresse, puis sur l'epingle a cote de 'MirAI Recorder' pour l'afficher en permanence."
+      "Si l'icone MirAI n'apparait pas : cliquez sur la piece de puzzle a droite de la barre d'adresse, puis sur l'epingle a cote de 'IAssistant-Direct (by Mirai)' pour l'afficher en permanence."
     ],
     "support": "En cas de probleme persistant, contactez fabrique-numerique@interieur.gouv.fr"
   },
   "changelog": [
+    {
+      "version": "1.2.3",
+      "date": "2026-05-30",
+      "changes": [
+        "Renommage : IAssistant-Direct (by Mirai)",
+        "Session longue duree : offline token Keycloak (pas de re-login ~6 mois) + token chiffre au repos",
+        "DGX en acces direct Keycloak/mcr ; config runtime servie sous ?profile=prod",
+        "Support des 2 URLs COMU (internet comu.gouv.fr + intranet comu.din.gouv.fr)",
+        "Overlay : wizard d'onboarding qui invite a se connecter quand le plug-in n'est pas active"
+      ]
+    },
     {
       "version": "1.2.2",
       "date": "2026-04-02",

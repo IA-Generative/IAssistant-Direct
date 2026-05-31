@@ -1,8 +1,39 @@
 # ADR : Deploiement on-premise DGX
 
 > Date : 2026-04-12
-> Statut : accepte
-> Contexte : deploiement de MirAI Browser sur l'infrastructure DGX (onyxia.gpu.minint.fr)
+> Statut : accepte — **partiellement supersede le 2026-05-30 (voir Mise a jour)**
+> Contexte : deploiement de IAssistant-Direct (by Mirai) / `mirai-browser` sur l'infrastructure DGX (onyxia.gpu.minint.fr)
+
+## Mise a jour 2026-05-30 — acces direct Keycloak/mcr (supersede §2 et §3)
+
+L'egress du navigateur DGX vers **Keycloak et l'API (mcr) a ete ouvert**. Le
+contournement par relais n'est donc plus necessaire **cote extension** :
+
+- Le profil `prod-dgx` pointe Keycloak **directement** : `keycloakIssuerUrl =
+  https://sso.mirai.interieur.gouv.fr/`, `keycloakRealm = "mirai"` (comme Scaleway).
+- `relayAssistantBaseUrl` est **retire** du profil DGX. L'indirection
+  `relay-assistant/keycloak` + realm vide (§2/§3) n'est **plus utilisee par l'extension**.
+- Les cibles de build `prod-dgx` / `prod-scaleway` ne different plus que par
+  `bootstrap_url`. Leur `config_path` pointe sur **`?profile=prod`** : chaque DM
+  sert ses propres valeurs d'environnement (profil `prod` generique a placeholders
+  `${{...}}`, resolus cote serveur). Les valeurs baties servent de fallback hors-ligne.
+- **Session longue duree** : l'extension demande desormais le scope `offline_access`
+  (token offline Keycloak) ; combine a *Offline Session Idle/Max = 180 j* cote realm,
+  l'utilisateur ne se reconnecte pas pendant ~6 mois. Le token est stocke **chiffre**
+  (AES-GCM). Voir `keycloak-offline-tokens.md`.
+- **Relay 401 a froid (cote DM)** : la validation des tokens par le device-management
+  fetch les JWKS Keycloak via `wireguard-proxy`. A froid, le handshake TLS a travers
+  le tunnel depassait `proxy_connect_timeout` (10 s) -> 504 -> 401 sur `/enroll`.
+  Corrige : `upstream ... keepalive` + `proxy_connect_timeout 60` dans le ConfigMap
+  nginx, + un Deployment `keycloak-warmer` (pod separe) qui garde le tunnel chaud.
+  Durcissement restant a grouper au prochain build d'image DM : `PyJWKClient(timeout=60)`
+  + pre-chauffe JWKS au demarrage.
+
+> Note : ce mecanisme JWKS-via-proxy reste pertinent **cote serveur DM** tant que
+> l'egress *serveur* (et non navigateur) vers Keycloak passe par le tunnel.
+
+---
+
 
 ## Probleme
 
@@ -19,12 +50,12 @@ Les services externes concernes : Keycloak SSO (`sso.mirai.interieur.gouv.fr`), 
 Deux profils de configuration (`prod-scaleway`, `prod-dgx`) dans `src/dm/config.json`.
 Les scripts `build.sh` et `deploy-release.sh` acceptent un flag `--target=dgx|scaleway`
 qui patche `activeProfile`, les fallbacks hardcodes (`bootstrap.js`, `background.js`)
-et suffixe les artefacts (`mirai-browser-1.2.2-dgx.crx`).
+et suffixe les artefacts (`mirai-browser-1.2.3-dgx.crx`).
 
 Les **sources git ne sont jamais modifiees** par le build — seules les copies dans `dist/`
 sont patchees. Un build par defaut (sans flag) produit la cible Scaleway.
 
-### 2. Authentification Keycloak via le relay-assistant (DGX)
+### 2. Authentification Keycloak via le relay-assistant (DGX) — ⚠️ SUPERSEDE 2026-05-30 (acces direct)
 
 Sur DGX, Chromium ne peut pas joindre `sso.mirai.interieur.gouv.fr` directement. Le
 Device Management expose un reverse-proxy nginx (`relay-assistant`) qui sort via le
@@ -40,7 +71,7 @@ Le realm est volontairement vide : le relay nginx expose
 dans le path. Le realm reel est injecte cote serveur via la variable
 `RELAY_KEYCLOAK_UPSTREAM=https://sso.mirai.interieur.gouv.fr/realms/mirai`.
 
-### 3. Endpoints Keycloak publics sur le relay (pas d'auth_request)
+### 3. Endpoints Keycloak publics sur le relay (pas d'auth_request) — ⚠️ SUPERSEDE 2026-05-30 (relais non utilise par l'extension)
 
 Les 3 endpoints OIDC (`/auth`, `/token`, `/userinfo`) etaient proteges par
 `auth_request /__relay_auth` dans nginx, exigeant des headers `X-Relay-Client` /
@@ -109,10 +140,10 @@ Scaleway, jamais les deux.
 scripts/build.sh --target=dgx --crx --xpi
 
 # Verifier la config embarquee
-unzip -p dist/mirai-browser-1.2.2-dgx.xpi dm-config.json | python3 -m json.tool
+unzip -p dist/mirai-browser-1.2.3-dgx.xpi dm-config.json | python3 -m json.tool
 
 # Verifier l'icone dans le zip
-unzip -l dist/mirai-browser-1.2.2-dgx.crx | grep assets/
+unzip -l dist/mirai-browser-1.2.3-dgx.crx | grep assets/
 
 # Build Scaleway
 scripts/build.sh --target=scaleway --crx --xpi

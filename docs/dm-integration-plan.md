@@ -1,5 +1,11 @@
 # MirAI Recorder -- Device Management Integration Plan
 
+> ⚠️ **Document HISTORIQUE (2026-03-29, v1.2.1)** — conserve comme trace de la
+> conception initiale de l'integration DM. Depuis : le plug-in est renomme
+> **IAssistant-Direct (by Mirai)** (slug `mirai-browser` inchange), DGX est en
+> acces Keycloak/mcr direct, config runtime servie sous `?profile=prod`, session
+> offline 6 mois. Se referer au README et a `adr-dgx-deployment.md` pour l'etat courant.
+
 > Date: 2026-03-29
 > Plugin: MirAI Recorder (Chrome/Firefox WebExtension)
 > Version actuelle: 1.2.1

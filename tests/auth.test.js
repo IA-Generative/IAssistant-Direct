@@ -45,9 +45,12 @@ beforeEach(() => {
   // Mock DMTelemetry
   window.DMTelemetry = { sendSpan: jest.fn() };
 
-  // Load auth.js
+  // Load crypto.js FIRST (expose TokenStore globally), then auth.js — same order
+  // as popup.html / options.html. auth.js stocke le token chiffré via TokenStore.
   const fs = require('fs');
-  const code = fs.readFileSync(require('path').join(__dirname, '..', 'src', 'auth.js'), 'utf8');
+  const path = require('path');
+  eval(fs.readFileSync(path.join(__dirname, '..', 'src', 'crypto.js'), 'utf8'));
+  const code = fs.readFileSync(path.join(__dirname, '..', 'src', 'auth.js'), 'utf8');
   eval(code);
 });
 
@@ -165,9 +168,13 @@ describe('MiraiAuth', () => {
 
   describe('login() — PKCE flow complet', () => {
     test('lance le flow interactif si pas de token', async () => {
+      // Silent attempt (launchWebAuthFlow interactive:false) fails...
       window.CompatAPI.launchWebAuthFlow
-        .mockRejectedValueOnce(new Error('silent failed'))
-        .mockResolvedValueOnce('https://test-extension-id.chromiumapp.org/?code=AUTH_CODE_123');
+        .mockRejectedValueOnce(new Error('silent failed'));
+      // ...then interactive flow opens a normal tab (v1.2.2: login via onglet
+      // normal pour compatibilite gestionnaire de mots de passe).
+      jest.spyOn(window.MiraiAuth, '_openTabAndWaitForCode')
+        .mockResolvedValueOnce('AUTH_CODE_123');
 
       const fakePayload = { sub: 'user-uuid-abc' };
       const fakeJWT = 'h.' + btoa(JSON.stringify(fakePayload)) + '.s';
@@ -187,17 +194,19 @@ describe('MiraiAuth', () => {
 
       expect(token).toBe(fakeJWT);
       expect(window.miraiUserUUID).toBe('user-uuid-abc');
-      expect(window.CompatAPI.launchWebAuthFlow).toHaveBeenCalledTimes(2);
-      const interactiveCall = window.CompatAPI.launchWebAuthFlow.mock.calls[1];
-      expect(interactiveCall[0].interactive).toBe(true);
-      expect(interactiveCall[0].url).toContain('code_challenge');
-      expect(interactiveCall[0].url).toContain('S256');
+      // Only the silent attempt goes through launchWebAuthFlow now.
+      expect(window.CompatAPI.launchWebAuthFlow).toHaveBeenCalledTimes(1);
+      expect(window.MiraiAuth._openTabAndWaitForCode).toHaveBeenCalledTimes(1);
+      const interactiveUrl = window.MiraiAuth._openTabAndWaitForCode.mock.calls[0][0];
+      expect(interactiveUrl).toContain('code_challenge');
+      expect(interactiveUrl).toContain('S256');
       expect(window.DMTelemetry.sendSpan).toHaveBeenCalledWith('login.success', { method: 'pkce' });
     });
 
     test('retourne null si l\'utilisateur refuse l\'auth', async () => {
       window.CompatAPI.launchWebAuthFlow
-        .mockRejectedValueOnce(new Error('silent failed'))
+        .mockRejectedValueOnce(new Error('silent failed'));
+      jest.spyOn(window.MiraiAuth, '_openTabAndWaitForCode')
         .mockResolvedValueOnce(null);
 
       const token = await window.MiraiAuth.login();
@@ -212,8 +221,9 @@ describe('MiraiAuth', () => {
       });
 
       window.CompatAPI.launchWebAuthFlow
-        .mockRejectedValueOnce(new Error('silent'))
-        .mockResolvedValueOnce('https://ext/?code=NEW_CODE');
+        .mockRejectedValueOnce(new Error('silent'));
+      jest.spyOn(window.MiraiAuth, '_openTabAndWaitForCode')
+        .mockResolvedValueOnce('NEW_CODE');
 
       const fakeJWT = 'h.' + btoa(JSON.stringify({ sub: 'u' })) + '.s';
       global.fetch
@@ -225,7 +235,9 @@ describe('MiraiAuth', () => {
 
       const token = await window.MiraiAuth.login({ force: true });
       expect(token).toBe(fakeJWT);
-      expect(window.CompatAPI.storageRemove).toHaveBeenCalledWith('miraiToken');
+      // force=true a bien purgé l'ancien token puis stocké le nouveau (chiffré).
+      const stored = await window.MiraiAuth._getStoredToken();
+      expect(stored.access_token).toBe(fakeJWT);
     });
   });
 

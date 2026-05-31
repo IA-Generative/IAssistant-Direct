@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug MirAI Recorder (Chromium)",
+      "name": "Debug IAssistant-Direct (by Mirai) — (Chromium)",
       "type": "chrome",
       "request": "launch",
       "url": "https://webconf.comu.gouv.fr/fr-FR/meeting/75964",
@@ -17,7 +17,7 @@
       "userDataDir": "${workspaceFolder}/.vscode-chrome-profile"
     },
     {
-      "name": "Debug MirAI Recorder (Chrome — manual load)",
+      "name": "Debug IAssistant-Direct (by Mirai) — (Chrome — manual load)",
       "type": "chrome",
       "request": "launch",
       "url": "chrome://extensions",
@@ -31,7 +31,7 @@
       "userDataDir": "${workspaceFolder}/.vscode-chrome-profile"
     },
     {
-      "name": "Debug MirAI Recorder (Firefox ESR)",
+      "name": "Debug IAssistant-Direct (by Mirai) — (Firefox ESR)",
       "type": "firefox",
       "request": "launch",
       "url": "about:debugging#/runtime/this-firefox",

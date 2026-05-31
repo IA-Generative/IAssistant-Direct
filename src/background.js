@@ -1,6 +1,10 @@
 // background.js — service worker (pas de DOM ici)
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
+// Import crypto.js (TokenStore) FIRST — recording.js et les handlers token en dépendent.
+try { importScripts('crypto.js'); } catch (e) { console.warn('[MirAI] importScripts crypto.js:', e.message); }
+// Import DMBootstrap (client config DM) — source unique de la config (issuer/realm…)
+try { importScripts('dm/bootstrap.js'); } catch (e) { console.warn('[MirAI] importScripts bootstrap.js:', e.message); }
 // Import recording.js functions (shared with popup)
 try { importScripts('recording.js'); } catch (e) { console.warn('[MirAI] importScripts recording.js:', e.message); }
 
@@ -21,6 +25,16 @@ api.runtime.onInstalled.addListener(async (details) => {
   // Create alarm for periodic config refresh (every 30 min)
   api.alarms.create('dm-config-refresh', { periodInMinutes: 30 });
   console.info('[MirAI DM] Config refresh alarm created (every 30 min).');
+
+  // Premier lancement : page de bienvenue (onboarding + invite a se connecter).
+  if (details.reason === 'install') {
+    try {
+      api.tabs.create({ url: api.runtime.getURL('src/welcome.html') });
+      console.info('[MirAI] First launch : welcome page opened.');
+    } catch (e) {
+      console.warn('[MirAI] Could not open welcome page:', e.message);
+    }
+  }
 });
 
 // Handle config refresh alarm
@@ -47,10 +61,13 @@ api.alarms.onAlarm.addListener(async (alarm) => {
 
     if (resp.ok) {
       const config = await resp.json();
-      await api.storage.local.set({ dmConfig: config, dmConfigLastFetch: Date.now() });
+      // Stocke la config APLATIE (keycloak* au top-level), cohérent avec bootstrap.js
+      // et avec ce que lisent overlay:pkceLogin / _ensureTokenFresh / DMBootstrap.
+      const flat = config.config || config;
+      await api.storage.local.set({ dmConfig: flat, dmConfigLastFetch: Date.now() });
       console.info('[MirAI DM] Config refreshed from DM.');
 
-      // Check for update directive
+      // Directive d'update lue sur l'objet brut (sibling de `config`)
       if (config.update && config.update.action === 'update') {
         const currentVersion = manifest.version;
         if (config.update.target_version && config.update.target_version !== currentVersion) {
@@ -58,7 +75,7 @@ api.alarms.onAlarm.addListener(async (alarm) => {
             type: 'basic',
             iconUrl: 'icons/icon128.png',
             title: 'Mise a jour disponible',
-            message: `MirAI Recorder ${config.update.target_version} est disponible.`
+            message: `IAssistant-Direct (by Mirai) ${config.update.target_version} est disponible.`
           });
           await api.storage.local.set({ dmUpdateAvailable: config.update });
         }
@@ -78,16 +95,15 @@ api.alarms.onAlarm.addListener(async (alarm) => {
 // Token refresh helper (used by overlay handlers)
 // ======================================================================
 async function _ensureTokenFresh() {
-  let { miraiToken } = await api.storage.local.get({ miraiToken: null });
+  let miraiToken = await TokenStore.getToken();
   if (!miraiToken?.access_token) throw new Error('Non connecte (SSO)');
 
   if (miraiToken.expires_in < Date.now() && miraiToken.refresh_token) {
     console.info('[MirAI] Token expired, refreshing...');
-    const { dmConfig } = await api.storage.local.get({ dmConfig: null });
-    const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr').replace(/\/+$/, '');
-    // Realm must NOT fall back to 'mirai' when explicitly empty (DGX relay
-    // exposes /keycloak/protocol/... without a realm segment in the path;
-    // the real realm is injected server-side via RELAY_KEYCLOAK_UPSTREAM).
+    // Config via DMBootstrap (cache/local/fallback — tous avec realm).
+    let dmConfig = {};
+    try { dmConfig = DMBootstrap.getConfig(); } catch (_) {}
+    const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr/realms/mirai').replace(/\/+$/, '');
     const realm = dmConfig?.keycloakRealm;
     const clientId = dmConfig?.keycloakClientId || 'mirai-extension';
     let tokenUrl = issuerUrl;
@@ -112,7 +128,7 @@ async function _ensureTokenFresh() {
         refresh_token: data.refresh_token || miraiToken.refresh_token,
         expires_in: Date.now() + (data.expires_in * 1000)
       };
-      await api.storage.local.set({ miraiToken });
+      await TokenStore.storeToken(miraiToken);
       console.info('[MirAI] Token refreshed in background.');
     } else {
       throw new Error('Refresh token echoue');
@@ -155,12 +171,10 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           });
           if (resp.ok) {
             const data = await resp.json();
-            await api.storage.local.set({
-              miraiToken: {
-                access_token: data.access_token,
-                refresh_token: data.refresh_token,
-                expires_in: Date.now() + (data.expires_in * 1000)
-              }
+            await TokenStore.storeToken({
+              access_token: data.access_token,
+              refresh_token: data.refresh_token,
+              expires_in: Date.now() + (data.expires_in * 1000)
             });
             console.info('[MirAI] Token obtained via overlay PKCE login.');
           }
@@ -261,12 +275,25 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Overlay: check auth status (non-interactive — refresh si expire, sinon authed:false)
+  if (msg?.type === 'overlay:checkAuth') {
+    (async () => {
+      try {
+        await _ensureTokenFresh();
+        sendResponse({ authed: true });
+      } catch (e) {
+        sendResponse({ authed: false });
+      }
+    })();
+    return true;
+  }
+
   // Overlay: check if a recording is active for this platform/url via API
   if (msg?.type === 'overlay:checkActive') {
     (async () => {
       try {
         await _ensureTokenFresh();
-        const { miraiToken } = await api.storage.local.get({ miraiToken: null });
+        const miraiToken = await TokenStore.getToken();
         const { dmConfig } = await api.storage.local.get({ dmConfig: null });
         const apiBase = dmConfig?.apiBase || 'https://compte-rendu.mirai.interieur.gouv.fr/api';
         const token = miraiToken?.access_token;
@@ -328,13 +355,16 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'overlay:pkceLogin') {
     (async () => {
       try {
-        const { dmConfig } = await api.storage.local.get({ dmConfig: null });
-        const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr').replace(/\/+$/, '');
-        // Realm must NOT fall back to 'mirai' when explicitly empty (DGX relay
-        // exposes /keycloak/protocol/... without a realm segment in the path;
-        // the real realm is injected server-side via RELAY_KEYCLOAK_UPSTREAM).
+        // Config via DMBootstrap (MÊME source que le popup) — issuer/realm fiables :
+        // fetch DM si possible, sinon config locale bakée, sinon fallback (tous avec realm).
+        let dmConfig = {};
+        try { dmConfig = await DMBootstrap.init(); }
+        catch (_) { try { dmConfig = DMBootstrap.getConfig(); } catch (_2) {} }
+        const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr/realms/mirai').replace(/\/+$/, '');
         const realm = dmConfig?.keycloakRealm;
         const clientId = dmConfig?.keycloakClientId || 'mirai-extension';
+        // issuer servi (= sso.mirai sans /realms) + realm -> ajoute /realms/{realm} ;
+        // issuer fallback contient déjà /realms/mirai -> laissé tel quel.
         let authBase = issuerUrl;
         if (!issuerUrl.includes('/realms/') && realm) {
           authBase = `${issuerUrl}/realms/${realm}`;
@@ -353,7 +383,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const authUrl = `${authBase}/protocol/openid-connect/auth?` + new URLSearchParams({
           client_id: clientId,
           response_type: 'code',
-          scope: 'openid profile email',
+          scope: 'openid profile email offline_access',
           redirect_uri: callbackUrl,
           code_challenge: codeChallenge,
           code_challenge_method: 'S256',

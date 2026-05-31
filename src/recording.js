@@ -43,7 +43,8 @@ async function startMiraiRecording(sessionData) {
 async function getLocalToken() {
   let token = null;
   try {
-    const { miraiToken } = await chrome.storage.local.get({ miraiToken: null });
+    // Token chiffré au repos → passe par TokenStore (crypto.js).
+    const miraiToken = await TokenStore.getToken();
     if (miraiToken && miraiToken.access_token) {
       token = miraiToken.access_token;
     }
@@ -51,9 +52,11 @@ async function getLocalToken() {
     console.warn('[MirAI] Impossible de récupérer le token local :', err);
   }
 
-  // 🔹 Vérifie si un token est disponible
+  // 🔹 Vérifie si un token est disponible. L'absence de token est un état NORMAL
+  // (pas encore connecté) : on lève une erreur que les appelants gerent (sync au
+  // demarrage = no-op ; clic REC / wizard = invite a se connecter via PKCE).
   if (!token) {
-    console.error('[MirAI] Aucun token d’accès MirAI trouvé : authentification requise.');
+    console.info('[MirAI] Pas de token : authentification requise (connexion via le wizard / Se connecter).');
     throw new Error('Authentification MirAI requise.');
   }
 

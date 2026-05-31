@@ -83,6 +83,19 @@
       <span id="mirai-mini-dot"></span>
       <span id="mirai-mini-timer"></span>
     </div>
+    <div id="mirai-wizard">
+      <div id="mirai-wizard-title">IAssistant-Direct <span style="opacity:.6">(by Mirai)</span></div>
+      <div id="mirai-wizard-body">
+        Capturez et transcrivez automatiquement vos r&eacute;unions en ligne
+        (Webconf, Visio, COMU, Webex, Meet, Teams&hellip;).
+        <br><br>
+        Pour activer le plug-in, connectez-vous avec votre compte minist&eacute;riel
+        en cliquant ci-dessous.
+      </div>
+      <button id="mirai-wizard-login">Se connecter pour activer</button>
+      <button id="mirai-wizard-cancel">Annuler</button>
+      <div id="mirai-wizard-status"></div>
+    </div>
   `;
 
   const style = document.createElement('style');
@@ -129,6 +142,38 @@
       to { opacity: 0.6; transform: translateY(0) scale(1); }
     }
     #mirai-pill.hidden { display: none; }
+
+    /* ── Onboarding wizard (no token) ── */
+    #mirai-wizard {
+      display: none;
+      width: 280px;
+      background: rgba(20, 20, 20, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 16px 18px;
+      border-radius: 16px;
+      box-shadow: 0 6px 28px rgba(0,0,0,0.35);
+      color: rgba(255,255,255,0.9);
+      cursor: default;
+      animation: mirai-fadein 0.3s ease;
+    }
+    #mirai-wizard.show { display: block; opacity: 1; }
+    #mirai-wizard-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+    #mirai-wizard-body { font-size: 12px; line-height: 1.45; color: rgba(255,255,255,0.78); margin-bottom: 14px; }
+    #mirai-wizard-login {
+      display: block; width: 100%; box-sizing: border-box;
+      background: #0072cf; color: #fff; border: none; border-radius: 10px;
+      padding: 9px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 0.2s;
+    }
+    #mirai-wizard-login:hover { background: #0a84ff; }
+    #mirai-wizard-cancel {
+      display: block; width: 100%; box-sizing: border-box; margin-top: 8px;
+      background: transparent; color: rgba(255,255,255,0.6); border: none;
+      padding: 6px; font-size: 12px; cursor: pointer; text-decoration: underline;
+    }
+    #mirai-wizard-cancel:hover { color: rgba(255,255,255,0.9); }
+    #mirai-wizard-status { font-size: 11px; color: #d29922; margin-top: 8px; min-height: 14px; text-align: center; }
 
     /* ── Mini mode ── */
     #mirai-mini {
@@ -682,6 +727,53 @@
   // Show platform briefly
   statusEl.textContent = detectedPlatform.charAt(0).toUpperCase() + detectedPlatform.slice(1);
   setTimeout(() => { if (!isRecording) statusEl.textContent = ''; }, 3000);
+
+  // ──────────────────────────────────────────────
+  // Onboarding wizard — montre quoi faire + invite a se connecter (pas de token)
+  // ──────────────────────────────────────────────
+  const pillEl = document.getElementById('mirai-pill');
+  const miniEl = document.getElementById('mirai-mini');
+  const wizardEl = document.getElementById('mirai-wizard');
+  const wizardLoginBtn = document.getElementById('mirai-wizard-login');
+  const wizardCancelBtn = document.getElementById('mirai-wizard-cancel');
+  const wizardStatus = document.getElementById('mirai-wizard-status');
+
+  function showWizard() {
+    pillEl.classList.add('hidden');
+    miniEl.style.display = 'none';
+    wizardEl.classList.add('show');
+  }
+  function hideWizard() {
+    wizardEl.classList.remove('show');
+    pillEl.classList.remove('hidden');
+  }
+
+  wizardLoginBtn.addEventListener('click', () => {
+    wizardStatus.textContent = 'Connexion...';
+    wizardLoginBtn.disabled = true;
+    B.runtime.sendMessage({ type: 'overlay:pkceLogin' }, (response) => {
+      wizardLoginBtn.disabled = false;
+      if (response?.ok) {
+        wizardStatus.textContent = '';
+        hideWizard();
+        statusEl.textContent = 'Connecte';
+        setTimeout(() => { if (!isRecording) statusEl.textContent = ''; }, 3000);
+      } else {
+        wizardStatus.textContent = 'Echec de connexion, reessayez.';
+      }
+    });
+  });
+
+  // Annuler : referme le wizard et reduit l'overlay (non intrusif).
+  wizardCancelBtn.addEventListener('click', () => {
+    hideWizard();
+    minimize();
+  });
+
+  // Au demarrage : si pas de token valide, afficher le wizard d'onboarding.
+  B.runtime.sendMessage({ type: 'overlay:checkAuth' }, (resp) => {
+    if (resp && resp.authed === false) showWizard();
+  });
 
   console.info(`[MirAI Overlay] Loaded on ${detectedPlatform}, meeting: ${detectedMeetingId || 'unknown'}`);
 })();
