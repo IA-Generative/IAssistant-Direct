@@ -38,6 +38,13 @@ esac
 # ──────────────────────────────────────────────
 SLUG="iassistant-direct-browser"
 GECKO_ID="mirai-assistant@interieur.gouv.fr"
+
+# --- Pipeline catalogue DM (le DM genere les manifests d'update) ---
+# Le client = autorite version/changelog/binaire ; le DM = autorite manifests/URLs.
+# Valeurs a confirmer avec l'agent DM (override possible par env).
+PLUGIN_ID="${PLUGIN_ID:-$SLUG}"                       # plugin_id == slug ?
+UPLOAD_AUTH_HEADER="${UPLOAD_AUTH_HEADER:-x-admin-token}"  # header du token de service CI ?
+DISTRIBUTION_MODE="${DISTRIBUTION_MODE:-canary}"      # canary | stable ?
 # BOOTSTRAP_URL = where we UPLOAD artefacts (DM server endpoint).
 # Defaults to the target's own bootstrap URL but can be overridden, e.g. to a staging DM.
 BOOTSTRAP_URL="${BOOTSTRAP_URL:-$TARGET_BOOTSTRAP}"
@@ -55,6 +62,12 @@ OUT_DIR="/tmp/${SLUG}-release"
 
 # Read version from manifest.json
 VERSION=$(python3 -c "import json; print(json.load(open('$EXT_DIR/manifest.json'))['version'])")
+# Release notes = changelog de la version courante (src/dm/manifest.json), pour le DM
+RELEASE_NOTES=$(python3 -c "
+import json
+cl = json.load(open('$EXT_DIR/src/dm/manifest.json')).get('changelog', [{}])[0]
+print('; '.join(cl.get('changes', [])))
+")
 echo "Building $SLUG v$VERSION (target=$TARGET, profile=$PROFILE)..."
 echo "  Target bootstrap (baked into artefact) : $TARGET_BOOTSTRAP"
 echo "  Upload endpoint  (DM server)           : $BOOTSTRAP_URL"
@@ -72,7 +85,7 @@ echo "Extension ID: $EXTENSION_ID"
 # 1. Prepare clean build directory
 # ──────────────────────────────────────────────
 rm -rf "$BUILD_DIR" "$OUT_DIR"
-mkdir -p "$BUILD_DIR" "$OUT_DIR/updates/${SLUG}"
+mkdir -p "$BUILD_DIR" "$OUT_DIR"
 
 # Copy only what the extension needs
 cp "$EXT_DIR/manifest.json" "$BUILD_DIR/"
@@ -87,12 +100,14 @@ cp -r "$EXT_DIR/icons/" "$BUILD_DIR/icons/"
 mkdir -p "$BUILD_DIR/assets"
 cp "$EXT_DIR/icons/icon128.png" "$BUILD_DIR/assets/icon128.png"
 
-# Inject update_url into manifest.json for auto-update (suffixed by target)
+# Inject update_url into manifest.json for auto-update.
+# Vise le DM de PRODUCTION de la cible (TARGET_BOOTSTRAP), pas l'endpoint d'upload
+# (BOOTSTRAP_URL, override-able vers un DM de staging). Routes GÉNÉRÉES par le DM.
 python3 -c "
 import json
 m = json.load(open('$BUILD_DIR/manifest.json'))
-m['update_url'] = '${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.xml'
-m['browser_specific_settings']['gecko']['update_url'] = '${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.json'
+m['update_url'] = '${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.xml'
+m['browser_specific_settings']['gecko']['update_url'] = '${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.json'
 json.dump(m, open('$BUILD_DIR/manifest.json', 'w'), indent=2, ensure_ascii=False)
 "
 
@@ -180,86 +195,39 @@ echo "Packaging XPI..."
 echo "  OK  ${SLUG}-${VERSION}-${TARGET}.xpi"
 
 # ──────────────────────────────────────────────
-# 4. Generate Chrome update manifest (XML)
-# ──────────────────────────────────────────────
-cat > "$OUT_DIR/updates/${SLUG}/${TARGET}.xml" <<XMLEOF
-<?xml version='1.0' encoding='UTF-8'?>
-<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
-  <app appid='${EXTENSION_ID}'>
-    <updatecheck codebase='${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.crx'
-                 version='${VERSION}' />
-  </app>
-</gupdate>
-XMLEOF
-echo "  OK  updates/${SLUG}/${TARGET}.xml (appid=${EXTENSION_ID})"
-
-# ──────────────────────────────────────────────
-# 5. Generate Firefox update manifest (JSON)
-# ──────────────────────────────────────────────
-cat > "$OUT_DIR/updates/${SLUG}/${TARGET}.json" <<JSONEOF
-{
-  "addons": {
-    "${GECKO_ID}": {
-      "updates": [
-        {
-          "version": "${VERSION}",
-          "update_link": "${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.xpi"
-        }
-      ]
-    }
-  }
-}
-JSONEOF
-echo "  OK  updates/${SLUG}/${TARGET}.json (gecko=${GECKO_ID})"
-
-# ──────────────────────────────────────────────
-# 6. Deploy to DM bootstrap server
+# 4. Publier les artefacts au pipeline catalogue DM
+#    Le DM enregistre 1 plugin_version + N artefacts (variantes) et GÉNÈRE lui-même
+#    les manifests d'update (gupdate XML / Mozilla JSON). On n'uploade plus de .xml/.json
+#    ni de binaires par PUT : tout passe par /catalog/{plugin_id}/versions/upload.
 # ──────────────────────────────────────────────
 echo ""
-echo "Deploying to $BOOTSTRAP_URL..."
+echo "Publishing to $BOOTSTRAP_URL (catalog pipeline)..."
 
-# Upload CRX
-if [ -f "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.crx" ]; then
-  echo -n "  Uploading CRX... "
-  curl -sf -X PUT "${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.crx" \
-    -H "X-Admin-Token: ${ADMIN_TOKEN}" \
-    -T "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.crx" \
-    && echo "OK" || echo "FAILED"
-fi
+# .crx -> Chromium (Chrome/Edge/Brave/Opera) ; .xpi -> Gecko (Firefox/Thunderbird).
+# Même version + même release_notes pour les deux : 1 plugin_version, N variantes.
+upload_variant() {
+  local file="$1" engine="$2" variant
+  if [ ! -f "$file" ]; then
+    echo "  SKIP ${engine}-${TARGET} ($(basename "$file") absent)"
+    return 0
+  fi
+  variant="${engine}-${TARGET}"
+  echo -n "  Upload ${variant} ($(basename "$file"))... "
+  if curl -sf -X POST "${BOOTSTRAP_URL}/catalog/${PLUGIN_ID}/versions/upload" \
+       -H "${UPLOAD_AUTH_HEADER}: ${ADMIN_TOKEN}" \
+       -F "version=${VERSION}" \
+       -F "release_notes=${RELEASE_NOTES}" \
+       -F "distribution_mode=${DISTRIBUTION_MODE}" \
+       -F "platform_variant=${variant}" \
+       -F "binary=@${file}" >/dev/null; then
+    echo "OK"
+  else
+    echo "FAILED"
+  fi
+}
 
-# Upload XPI
-echo -n "  Uploading XPI... "
-curl -sf -X PUT "${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.xpi" \
-  -H "X-Admin-Token: ${ADMIN_TOKEN}" \
-  -T "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.xpi" \
-  && echo "OK" || echo "FAILED"
-
-# Upload Chrome update manifest
-echo -n "  Uploading Chrome update manifest... "
-curl -sf -X PUT "${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.xml" \
-  -H "X-Admin-Token: ${ADMIN_TOKEN}" \
-  -H "Content-Type: application/xml" \
-  -T "$OUT_DIR/updates/${SLUG}/${TARGET}.xml" \
-  && echo "OK" || echo "FAILED"
-
-# Upload Firefox update manifest
-echo -n "  Uploading Firefox update manifest... "
-curl -sf -X PUT "${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.json" \
-  -H "X-Admin-Token: ${ADMIN_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -T "$OUT_DIR/updates/${SLUG}/${TARGET}.json" \
-  && echo "OK" || echo "FAILED"
-
-# Deploy config (canary strategy)
-echo -n "  Deploying config bundle... "
-ZIP_PATH="/tmp/${SLUG}-config.zip"
-(cd "$BUILD_DIR" && zip -r -q "$ZIP_PATH" .)
-curl -sf -X POST "${BOOTSTRAP_URL}/api/plugins/${SLUG}/deploy" \
-  -H "X-Admin-Token: ${ADMIN_TOKEN}" \
-  -F "binary=@${ZIP_PATH}" \
-  -F "strategy=canary" | python3 -m json.tool 2>/dev/null \
-  && echo "" || echo "FAILED"
-rm -f "$ZIP_PATH"
+upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.crx" "chromium"
+upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.xpi" "gecko"
 
 # ──────────────────────────────────────────────
 # 7. Summary
@@ -274,13 +242,11 @@ echo ""
 echo " Artifacts:"
 ls -lh "$OUT_DIR/"*.crx "$OUT_DIR/"*.xpi 2>/dev/null | awk '{print "   " $NF " (" $5 ")"}'
 echo ""
-echo " Update endpoints:"
-echo "   Chrome : ${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.xml"
-echo "   Firefox: ${BOOTSTRAP_URL}/updates/${SLUG}/${TARGET}.json"
+echo " Update endpoints (manifests GENERES par le DM) :"
+echo "   Chrome/Edge        : ${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.xml"
+echo "   Firefox/Thunderbird: ${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.json"
 echo ""
-echo " Download URLs:"
-echo "   CRX: ${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.crx"
-echo "   XPI: ${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.xpi"
+echo " Variantes publiees : chromium-${TARGET}, gecko-${TARGET} (download interne au DM)"
 echo ""
 echo " Auto-update: navigateurs verifient periodiquement"
 echo "   Chrome  ~5h  | Firefox ~24h"
