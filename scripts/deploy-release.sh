@@ -41,15 +41,19 @@ GECKO_ID="mirai-assistant@interieur.gouv.fr"
 
 # --- Pipeline catalogue DM (le DM genere les manifests d'update) ---
 # Le client = autorite version/changelog/binaire ; le DM = autorite manifests/URLs.
-# Valeurs a confirmer avec l'agent DM (override possible par env).
-PLUGIN_ID="${PLUGIN_ID:-$SLUG}"                       # plugin_id == slug ?
-UPLOAD_AUTH_HEADER="${UPLOAD_AUTH_HEADER:-x-admin-token}"  # header du token de service CI ?
-DISTRIBUTION_MODE="${DISTRIBUTION_MODE:-canary}"      # canary | stable ?
-# BOOTSTRAP_URL = where we UPLOAD artefacts (DM server endpoint).
-# Defaults to the target's own bootstrap URL but can be overridden, e.g. to a staging DM.
+# Valeurs confirmees par l'agent DM (image 0.6.x). Override possible par env.
+TOKEN_HEADER="${TOKEN_HEADER:-x-admin-token}"        # comparé constant-time, insensible casse
+DISTRIBUTION_MODE="${DISTRIBUTION_MODE:-managed}"    # managed|download_link|store|manual
+PLATFORM_VARIANT="${PLATFORM_VARIANT:-mv3}"          # ""|mv2|mv3|tb60|tb128 — ici MV3 (.crx ET .xpi)
+ENVIRONMENT="${ENVIRONMENT:-prod}"                   # dev|int|prod (defaut DM = dev)
+# plugin_id = id ENTIER du catalogue (PAS le slug) ; resolu via GET /catalog/api/plugins.
+# Surchargeable par env (CI / tests hors-ligne).
+PLUGIN_ID="${PLUGIN_ID:-}"
+# BOOTSTRAP_URL = DM cible de l'upload (= le DM de la region TARGET). Override staging possible.
 BOOTSTRAP_URL="${BOOTSTRAP_URL:-$TARGET_BOOTSTRAP}"
-ADMIN_TOKEN="${DM_ADMIN_TOKEN:-}"
-[ -n "$ADMIN_TOKEN" ] || { echo "ERROR: DM_ADMIN_TOKEN not set"; exit 1; }
+# Token de service CI : x-admin-token = <DM_QUEUE_ADMIN_TOKEN> (fallback DM_ADMIN_TOKEN).
+ADMIN_TOKEN="${DM_QUEUE_ADMIN_TOKEN:-${DM_ADMIN_TOKEN:-}}"
+[ -n "$ADMIN_TOKEN" ] || { echo "ERROR: DM_QUEUE_ADMIN_TOKEN not set"; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 EXT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -196,29 +200,44 @@ echo "  OK  ${SLUG}-${VERSION}-${TARGET}.xpi"
 
 # ──────────────────────────────────────────────
 # 4. Publier les artefacts au pipeline catalogue DM
-#    Le DM enregistre 1 plugin_version + N artefacts (variantes) et GÉNÈRE lui-même
-#    les manifests d'update (gupdate XML / Mozilla JSON). On n'uploade plus de .xml/.json
-#    ni de binaires par PUT : tout passe par /catalog/{plugin_id}/versions/upload.
+#    Le DM enregistre 1 plugin_version + N artefacts et GÉNÈRE lui-même les manifests
+#    d'update (gupdate XML / Mozilla JSON). Endpoint : POST /admin/catalog/{plugin_id}/versions/upload
+#    (plugin_id = id ENTIER, resolu depuis le catalogue ; le format vient de l'extension .crx/.xpi).
+#    La cible scaleway/dgx = QUEL DM (BOOTSTRAP_URL), pas un champ d'upload.
 # ──────────────────────────────────────────────
 echo ""
 echo "Publishing to $BOOTSTRAP_URL (catalog pipeline)..."
 
+# Resoudre le plugin_id (entier) depuis le catalogue du DM cible, si non fourni par env.
+if [ -z "$PLUGIN_ID" ]; then
+  echo -n "  Resolving plugin_id for slug '$SLUG'... "
+  PLUGIN_ID=$(curl -sf "${BOOTSTRAP_URL}/catalog/api/plugins" 2>/dev/null \
+    | python3 -c "import sys,json; ps=json.load(sys.stdin).get('plugins',[]); print(next((p['id'] for p in ps if p.get('slug')=='$SLUG'), ''))" 2>/dev/null)
+  if [ -z "$PLUGIN_ID" ]; then
+    echo "ECHEC"
+    echo "ERROR: plugin_id introuvable pour slug '$SLUG' via ${BOOTSTRAP_URL}/catalog/api/plugins"
+    echo "       (plugin non enregistre ? sinon passer PLUGIN_ID=<id> en env)"
+    exit 1
+  fi
+  echo "id=$PLUGIN_ID"
+fi
+
 # .crx -> Chromium (Chrome/Edge/Brave/Opera) ; .xpi -> Gecko (Firefox/Thunderbird).
-# Même version + même release_notes pour les deux : 1 plugin_version, N variantes.
+# Même version + même release_notes : 1 plugin_version, N artefacts. platform_variant=mv3.
 upload_variant() {
-  local file="$1" engine="$2" variant
+  local file="$1" label="$2"
   if [ ! -f "$file" ]; then
-    echo "  SKIP ${engine}-${TARGET} ($(basename "$file") absent)"
+    echo "  SKIP ${label} ($(basename "$file") absent)"
     return 0
   fi
-  variant="${engine}-${TARGET}"
-  echo -n "  Upload ${variant} ($(basename "$file"))... "
-  if curl -sf -X POST "${BOOTSTRAP_URL}/catalog/${PLUGIN_ID}/versions/upload" \
-       -H "${UPLOAD_AUTH_HEADER}: ${ADMIN_TOKEN}" \
+  echo -n "  Upload ${label} ($(basename "$file"))... "
+  if curl -sf -X POST "${BOOTSTRAP_URL}/admin/catalog/${PLUGIN_ID}/versions/upload" \
+       -H "${TOKEN_HEADER}: ${ADMIN_TOKEN}" \
        -F "version=${VERSION}" \
-       -F "release_notes=${RELEASE_NOTES}" \
+       -F "platform_variant=${PLATFORM_VARIANT}" \
        -F "distribution_mode=${DISTRIBUTION_MODE}" \
-       -F "platform_variant=${variant}" \
+       -F "environment=${ENVIRONMENT}" \
+       -F "release_notes=${RELEASE_NOTES}" \
        -F "binary=@${file}" >/dev/null; then
     echo "OK"
   else
@@ -226,8 +245,8 @@ upload_variant() {
   fi
 }
 
-upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.crx" "chromium"
-upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.xpi" "gecko"
+upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.crx" "chromium .crx"
+upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.xpi" "gecko .xpi"
 
 # ──────────────────────────────────────────────
 # 7. Summary
@@ -246,7 +265,8 @@ echo " Update endpoints (manifests GENERES par le DM) :"
 echo "   Chrome/Edge        : ${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.xml"
 echo "   Firefox/Thunderbird: ${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.json"
 echo ""
-echo " Variantes publiees : chromium-${TARGET}, gecko-${TARGET} (download interne au DM)"
+echo " Artefacts publies (plugin_id=${PLUGIN_ID}, env=${ENVIRONMENT}, variant=${PLATFORM_VARIANT}) :"
+echo "   .crx (Chromium) + .xpi (Gecko) ; download interne au DM"
 echo ""
 echo " Auto-update: navigateurs verifient periodiquement"
 echo "   Chrome  ~5h  | Firefox ~24h"
