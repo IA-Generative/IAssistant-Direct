@@ -2,7 +2,7 @@
 # register-dm.sh — Enregistre le plugin iassistant-direct-browser dans le Device Management
 #
 # Usage:
-#   scripts/register-dm.sh                         → enregistre le plugin (DM local localhost:3001)
+#   scripts/register-dm.sh                         → enregistre le plugin (DM local localhost:8089)
 #   DM_URL=https://dm.example.gouv.fr scripts/register-dm.sh  → DM distant
 #   DM_QUEUE_ADMIN_TOKEN=xxx scripts/register-dm.sh --refresh-template
 #                                                  → met a jour UNIQUEMENT le config_template
@@ -17,7 +17,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-DM_URL="${DM_URL:-http://localhost:3001}"
+DM_URL="${DM_URL:-http://localhost:8089}"
 MANIFEST="$ROOT_DIR/src/dm/manifest.json"
 # config_template = le TEMPLATE DM (placeholders ${{...}}), PAS la config bakee client.
 CONFIG="$ROOT_DIR/src/dm/dm-config.json"

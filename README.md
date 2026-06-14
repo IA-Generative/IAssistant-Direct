@@ -147,7 +147,7 @@ il n'est **pas** necessaire d'editer le fichier a la main pour changer de cible.
 
 | Profil | role | bootstrap_url | Keycloak (fallback) |
 |--------|------|--------------|----------|
-| dev | build local | `http://localhost:3001` | `localhost:8082/realms/openwebui` |
+| dev | build local | `http://localhost:8089` | `localhost:8082/realms/openwebui` |
 | int | build integration | `https://bootstrap.fake-domain.name` | placeholders DM |
 | **prod** | **profil servi au runtime** (`?profile=prod`) | — | `${{KEYCLOAK_ISSUER_URL}}` (resolu par chaque DM) |
 | prod-scaleway | build cible Scaleway | `https://bootstrap.fake-domain.name` | `sso.mirai.interieur.gouv.fr/realms/mirai` |

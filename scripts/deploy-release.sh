@@ -44,7 +44,12 @@ GECKO_ID="mirai-assistant@interieur.gouv.fr"
 # Valeurs confirmees par l'agent DM (image 0.6.x). Override possible par env.
 TOKEN_HEADER="${TOKEN_HEADER:-x-admin-token}"        # comparé constant-time, insensible casse
 DISTRIBUTION_MODE="${DISTRIBUTION_MODE:-managed}"    # managed|download_link|store|manual
-PLATFORM_VARIANT="${PLATFORM_VARIANT:-mv3}"          # ""|mv2|mv3|tb60|tb128 — ici MV3 (.crx ET .xpi)
+# platform_variant = "<engine>-<target>" (chromium-${TARGET} / gecko-${TARGET}).
+# C'est la cle que le DM cherche pour generer chaque manifest d'update :
+#   /updates/{slug}/{target}.xml  -> chromium-${TARGET}
+#   /updates/{slug}/{target}.json -> gecko-${TARGET}
+# Un variant DISTINCT par moteur => les .crx et .xpi coexistent sous 1 plugin_version
+# (sinon ON CONFLICT sur (version,variant) ecrase l'un par l'autre). Voir main.py:_UPDATE_ENGINE_BY_EXT.
 ENVIRONMENT="${ENVIRONMENT:-prod}"                   # dev|int|prod (defaut DM = dev)
 # plugin_id = id ENTIER du catalogue (PAS le slug) ; resolu via GET /catalog/api/plugins.
 # Surchargeable par env (CI / tests hors-ligne).
@@ -223,18 +228,19 @@ if [ -z "$PLUGIN_ID" ]; then
 fi
 
 # .crx -> Chromium (Chrome/Edge/Brave/Opera) ; .xpi -> Gecko (Firefox/Thunderbird).
-# Même version + même release_notes : 1 plugin_version, N artefacts. platform_variant=mv3.
+# Même version + même release_notes : 1 plugin_version, N artefacts.
+# platform_variant distinct par moteur (chromium-${TARGET} / gecko-${TARGET}) => coexistence.
 upload_variant() {
-  local file="$1" label="$2"
+  local file="$1" label="$2" variant="$3"
   if [ ! -f "$file" ]; then
     echo "  SKIP ${label} ($(basename "$file") absent)"
     return 0
   fi
-  echo -n "  Upload ${label} ($(basename "$file"))... "
+  echo -n "  Upload ${label} ($(basename "$file"), variant=${variant})... "
   if curl -sf -X POST "${BOOTSTRAP_URL}/admin/catalog/${PLUGIN_ID}/versions/upload" \
        -H "${TOKEN_HEADER}: ${ADMIN_TOKEN}" \
        -F "version=${VERSION}" \
-       -F "platform_variant=${PLATFORM_VARIANT}" \
+       -F "platform_variant=${variant}" \
        -F "distribution_mode=${DISTRIBUTION_MODE}" \
        -F "environment=${ENVIRONMENT}" \
        -F "release_notes=${RELEASE_NOTES}" \
@@ -245,8 +251,8 @@ upload_variant() {
   fi
 }
 
-upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.crx" "chromium .crx"
-upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.xpi" "gecko .xpi"
+upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.crx" "chromium .crx" "chromium-${TARGET}"
+upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.xpi" "gecko .xpi"     "gecko-${TARGET}"
 
 # ──────────────────────────────────────────────
 # 7. Summary
@@ -265,8 +271,8 @@ echo " Update endpoints (manifests GENERES par le DM) :"
 echo "   Chrome/Edge        : ${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.xml"
 echo "   Firefox/Thunderbird: ${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.json"
 echo ""
-echo " Artefacts publies (plugin_id=${PLUGIN_ID}, env=${ENVIRONMENT}, variant=${PLATFORM_VARIANT}) :"
-echo "   .crx (Chromium) + .xpi (Gecko) ; download interne au DM"
+echo " Artefacts publies (plugin_id=${PLUGIN_ID}, env=${ENVIRONMENT}) :"
+echo "   .crx variant=chromium-${TARGET} + .xpi variant=gecko-${TARGET} ; download interne au DM"
 echo ""
 echo " Auto-update: navigateurs verifient periodiquement"
 echo "   Chrome  ~5h  | Firefox ~24h"

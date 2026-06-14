@@ -16,7 +16,7 @@
   },
   "dev": {
     "_description": "Dev avec DM Docker Compose local",
-    "bootstrap_url": "http://localhost:3001",
+    "bootstrap_url": "http://localhost:8089",
     "config_path": "/config/iassistant-direct-browser/config.json?profile=dev",
     "relayAssistantBaseUrl": "http://localhost:8088/relay-assistant",
     "keycloakIssuerUrl": "http://localhost:8082",
