@@ -1,7 +1,7 @@
 {
   "configVersion": 1,
   "slug": "iassistant-direct-browser",
-  "activeProfile": "prod-scaleway",
+  "activeProfile": "prod",
   "_description": "Config BAKEE client (init + fallback hors-ligne). Vraies valeurs uniquement, JAMAIS de placeholder substituable (ceux-ci vivent dans le template src/dm/dm-config.json, resolu cote DM). L'extension ne lit pas keycloak_redirect_uri (redirect calcule via chrome.identity). Voir docs/adr-plugin-dm-integration.md.",
   "default": {
     "portal_url": "https://mirai.interieur.gouv.fr",
@@ -39,41 +39,14 @@
     "comuUrl": "https://webconf.comu.gouv.fr/"
   },
   "prod": {
-    "_description": "Production generique — fallback hors-ligne ; chaque DM sert ses propres valeurs sous ?profile=prod.",
-    "bootstrap_url": "https://bootstrap.fake-domain.name",
-    "config_path": "/config/iassistant-direct-browser/config.json?profile=prod",
-    "keycloakIssuerUrl": "https://sso.mirai.interieur.gouv.fr/realms/mirai",
-    "keycloakRealm": "mirai",
-    "keycloakClientId": "mirai-extension",
-    "apiBase": "https://compte-rendu.mirai.interieur.gouv.fr/api",
-    "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
-    "comuUrl": "https://webconf.comu.gouv.fr/"
-  },
-  "prod-scaleway": {
-    "_description": "Build cible Scaleway (cloud). Config runtime servie par le DM sous ?profile=prod ; valeurs ci-dessous = fallback si DM injoignable.",
-    "bootstrap_url": "https://bootstrap.fake-domain.name",
-    "config_path": "/config/iassistant-direct-browser/config.json?profile=prod",
-    "keycloakIssuerUrl": "https://sso.mirai.interieur.gouv.fr/",
-    "keycloakRealm": "mirai",
-    "keycloakClientId": "mirai-extension",
-    "apiBase": "https://compte-rendu.mirai.interieur.gouv.fr/api",
-    "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
-    "comuUrl": "https://webconf.comu.gouv.fr/"
-  },
-  "prod-dgx": {
-    "_description": "Build cible DGX (onyxia). Keycloak/mcr en acces DIRECT (egress navigateur ouvert). Config runtime servie par le DM sous ?profile=prod ; valeurs ci-dessous = fallback si DM injoignable.",
-    "bootstrap_url": "https://onyxia.gpu.minint.fr/bootstrap",
-    "config_path": "/config/iassistant-direct-browser/config.json?profile=prod",
-    "keycloakIssuerUrl": "https://sso.mirai.interieur.gouv.fr/",
-    "keycloakRealm": "mirai",
-    "keycloakClientId": "mirai-extension",
-    "apiBase": "https://compte-rendu.mirai.interieur.gouv.fr/api",
-    "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
-    "comuUrl": "https://webconf.comu.din.gouv.fr/"
-  },
-  "prod-onprem": {
-    "_description": "Build cible on-premise (cluster OpenShift ocpbm02s2). Config runtime servie par le DM sous ?profile=prod ; valeurs ci-dessous = fallback si DM injoignable.",
-    "bootstrap_url": "https://bootstrap.apps.ocpbm02s2.cores.r2.pi2.minint.fr",
+    "_description": "Production — liste ORDONNEE de DM (ordre = priorite : [0]=primaire, puis secours). Le bootstrap scanne et garde le premier qui repond ; CE DM sert la config runtime sous ?profile=prod. Ordre de resolution: preference utilisateur (options) > liste poussee par le DM > cette liste bakee. Valeurs ci-dessous = fallback hors-ligne si AUCUN DM ne repond.",
+    "bootstrap_urls": [
+      "https://bootstrap.apps.ocpbm02s2.cores.r2.pi2.minint.fr",
+      "https://onyxia.gpu.minint.fr/bootstrap",
+      "https://bootstrap.fake-domain.name"
+    ],
+    "bootstrap_stagger_ms": 800,
+    "bootstrap_timeout_ms": 4000,
     "config_path": "/config/iassistant-direct-browser/config.json?profile=prod",
     "keycloakIssuerUrl": "https://sso.mirai.interieur.gouv.fr/",
     "keycloakRealm": "mirai",

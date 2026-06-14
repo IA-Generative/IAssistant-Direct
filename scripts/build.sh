@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # build.sh — Compile le plugin Chrome/Firefox avec les fichiers DM
 # Usage:
-#   scripts/build.sh                              → build Scaleway (defaut)
-#   scripts/build.sh --target=dgx                 → build DGX
-#   scripts/build.sh --target=scaleway            → build Scaleway (explicite)
-#   scripts/build.sh --target=onprem              → build on-premise (OpenShift ocpbm02s2)
-#   scripts/build.sh --target=local               → build DM local (localhost:8089)
-#   scripts/build.sh --target=dgx --crx --xpi     → DGX + .crx signe + .xpi
+#   scripts/build.sh                              → build prod (defaut)
+#   scripts/build.sh --target=prod                → build prod (explicite)
+#   scripts/build.sh --target=local               → build DM local (localhost:8089, profil dev)
+#   scripts/build.sh --target=prod --crx --xpi    → prod + .crx signe + .xpi
+#
+# UN SEUL package prod : le profil "prod" porte la LISTE ORDONNEE bootstrap_urls
+# (scaleway/dgx/onprem). L'extension scanne et garde le DM qui repond — plus besoin
+# d'un build par environnement. Voir src/dm/config.json et src/dm/bootstrap.js.
 #
 # Les artefacts sont suffixes par la cible :
 #   dist/iassistant-direct-browser-${VERSION}-${TARGET}.crx
@@ -22,19 +24,19 @@ VERSION=$(python3 -c "import json; print(json.load(open('$ROOT_DIR/manifest.json
 # ──────────────────────────────────────────────
 # Parse --target
 # ──────────────────────────────────────────────
-TARGET="scaleway"
+TARGET="prod"
 for arg in "$@"; do
   case "$arg" in
     --target=*) TARGET="${arg#--target=}" ;;
   esac
 done
 
+# BOOTSTRAP_URL = fallback hardcode de DERNIER recours (si lecture config.json KO).
+# En prod la liste bootstrap_urls (config.json) fait foi ; on bake le primaire ici.
 case "$TARGET" in
-  scaleway) PROFILE="prod-scaleway" ; BOOTSTRAP_URL="https://bootstrap.fake-domain.name" ;;
-  dgx)      PROFILE="prod-dgx"      ; BOOTSTRAP_URL="https://onyxia.gpu.minint.fr/bootstrap" ;;
-  onprem)   PROFILE="prod-onprem"   ; BOOTSTRAP_URL="https://bootstrap.apps.ocpbm02s2.cores.r2.pi2.minint.fr" ;;
-  local)    PROFILE="dev"           ; BOOTSTRAP_URL="http://localhost:8089" ;;
-  *)        echo "ERREUR: target inconnue '$TARGET' (attendu: scaleway|dgx|onprem|local)" >&2 ; exit 1 ;;
+  prod)   PROFILE="prod" ; BOOTSTRAP_URL="https://bootstrap.apps.ocpbm02s2.cores.r2.pi2.minint.fr" ;;
+  local)  PROFILE="dev"  ; BOOTSTRAP_URL="http://localhost:8089" ;;
+  *)      echo "ERREUR: target inconnue '$TARGET' (attendu: prod|local)" >&2 ; exit 1 ;;
 esac
 
 echo "Building MirAI Recorder v$VERSION (target=$TARGET, profile=$PROFILE)..."

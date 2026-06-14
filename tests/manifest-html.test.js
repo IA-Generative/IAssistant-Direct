@@ -43,11 +43,14 @@ describe('dm/config.json', () => {
     expect(config.configVersion).toBe(1);
   });
 
-  test('contient les profils dev, int, prod-scaleway, prod-dgx', () => {
+  test('contient les profils dev, int, prod (UN seul prod multi-DM)', () => {
     expect(config.dev).toBeDefined();
     expect(config.int).toBeDefined();
-    expect(config['prod-scaleway']).toBeDefined();
-    expect(config['prod-dgx']).toBeDefined();
+    expect(config.prod).toBeDefined();
+    // Les anciens profils par environnement sont supprimes (collapse en prod unique).
+    expect(config['prod-scaleway']).toBeUndefined();
+    expect(config['prod-dgx']).toBeUndefined();
+    expect(config['prod-onprem']).toBeUndefined();
   });
 
   test('contient slug et activeProfile', () => {
@@ -68,39 +71,36 @@ describe('dm/config.json', () => {
     expect(config.int.comuUrl).toBeDefined();
   });
 
-  test('profil prod-scaleway pointe Keycloak sur sso.mirai.interieur.gouv.fr', () => {
-    expect(config['prod-scaleway'].keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
-    expect(config['prod-scaleway'].keycloakRealm).toBe('mirai');
-    expect(config['prod-scaleway'].bootstrap_url).toBe('https://bootstrap.fake-domain.name');
+  test('profil prod : liste ORDONNEE bootstrap_urls (scaleway/dgx/onprem)', () => {
+    const urls = config.prod.bootstrap_urls;
+    expect(Array.isArray(urls)).toBe(true);
+    expect(urls.length).toBeGreaterThanOrEqual(2);
+    // Les 3 environnements sont presents dans la liste candidate.
+    expect(urls).toContain('https://bootstrap.apps.ocpbm02s2.cores.r2.pi2.minint.fr');
+    expect(urls).toContain('https://onyxia.gpu.minint.fr/bootstrap');
+    expect(urls).toContain('https://bootstrap.fake-domain.name');
   });
 
-  test('profil prod-dgx pointe Keycloak en direct (egress navigateur ouvert)', () => {
-    // L'egress navigateur DGX vers Keycloak/mcr est desormais ouvert : on pointe
-    // l'issuer directement sur le SSO (plus de relay), comme Scaleway.
-    expect(config['prod-dgx'].keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
-    expect(config['prod-dgx'].keycloakRealm).toBe('mirai');
-    expect(config['prod-dgx'].bootstrap_url).toBe('https://onyxia.gpu.minint.fr/bootstrap');
-    // Le relay n'est plus utilise par l'extension sur DGX.
-    expect(config['prod-dgx'].relayAssistantBaseUrl).toBeUndefined();
-  });
-
-  test('le config_path des profils prod pointe sur ?profile=prod (resolu par chaque DM)', () => {
-    expect(config['prod-dgx'].config_path).toContain('profile=prod');
-    expect(config['prod-scaleway'].config_path).toContain('profile=prod');
-    // Config BAKEE : le profil generique prod porte une vraie valeur (fallback hors-ligne) ;
-    // les placeholders ${{}} resolus cote DM vivent dans src/dm/dm-config.json (template).
+  test('profil prod : Keycloak SSO + parametres de scan', () => {
     expect(config.prod.keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
+    expect(config.prod.keycloakRealm).toBe('mirai');
+    expect(config.prod.keycloakClientId).toBe('mirai-extension');
     expect(config.prod.relayAssistantBaseUrl).toBeUndefined();
+    // Parametres de la course echelonnee.
+    expect(typeof config.prod.bootstrap_stagger_ms).toBe('number');
+    expect(typeof config.prod.bootstrap_timeout_ms).toBe('number');
   });
 
-  test('les deux profils prod partagent le meme client Keycloak', () => {
-    expect(config['prod-scaleway'].keycloakClientId).toBe('mirai-extension');
-    expect(config['prod-dgx'].keycloakClientId).toBe('mirai-extension');
+  test('le config_path de prod pointe sur ?profile=prod (resolu par le DM gagnant)', () => {
+    expect(config.prod.config_path).toContain('profile=prod');
   });
 
-  test('chaque profil a un bootstrap_url et config_path', () => {
-    for (const p of ['dev', 'int', 'prod-scaleway', 'prod-dgx']) {
-      expect(config[p].bootstrap_url).toBeDefined();
+  test('chaque profil a de quoi joindre un DM (bootstrap_url ou bootstrap_urls) + config_path', () => {
+    // dev/int : URL unique ; prod : liste.
+    expect(config.dev.bootstrap_url).toBeDefined();
+    expect(config.int.bootstrap_url).toBeDefined();
+    expect(config.prod.bootstrap_urls).toBeDefined();
+    for (const p of ['dev', 'int', 'prod']) {
       expect(config[p].config_path).toBeDefined();
     }
   });

@@ -46,9 +46,19 @@ api.alarms.onAlarm.addListener(async (alarm) => {
     const { dmClientUUID, dmConfig: cachedConfig } = await api.storage.local.get(['dmClientUUID', 'dmConfig']);
     const manifest = api.runtime.getManifest();
 
-    // Read DM params from cached config (set by bootstrap.js at popup init)
-    const bootstrapUrl = cachedConfig?.bootstrap_url || 'https://bootstrap.fake-domain.name';
-    const configPath = cachedConfig?.config_path || '/config/iassistant-direct-browser/config.json?profile=int';
+    // Resout le DM a interroger : URL collante (dernier resolu) si elle repond,
+    // sinon scan ordonne (preference > pousse DM > liste bakee). Retombe sur la
+    // config cachee si DMBootstrap indisponible.
+    let bootstrapUrl = null;
+    try {
+      if (typeof DMBootstrap !== 'undefined') {
+        bootstrapUrl = await DMBootstrap.resolveBootstrap();
+      }
+    } catch (e) {
+      console.warn('[MirAI DM] resolveBootstrap failed:', e.message);
+    }
+    bootstrapUrl = bootstrapUrl || cachedConfig?.bootstrap_url || 'https://bootstrap.fake-domain.name';
+    const configPath = cachedConfig?.config_path || '/config/iassistant-direct-browser/config.json?profile=prod';
 
     const resp = await fetch(`${bootstrapUrl}${configPath}`, {
       headers: {
