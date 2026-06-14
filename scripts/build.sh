@@ -3,23 +3,54 @@
 # Usage:
 #   scripts/build.sh                              → build prod (defaut)
 #   scripts/build.sh --target=prod                → build prod (explicite)
+#   scripts/build.sh --target=int                 → build integration (profil int)
 #   scripts/build.sh --target=local               → build DM local (localhost:8089, profil dev)
 #   scripts/build.sh --target=prod --crx --xpi    → prod + .crx signe + .xpi
+#   scripts/build.sh --all --crx --xpi            → TOUS les profils, un dossier par cible
+#                                                   (dist/prod/  dist/int/  dist/local/)
 #
 # UN SEUL package prod : le profil "prod" porte la LISTE ORDONNEE bootstrap_urls
 # (scaleway/dgx/onprem). L'extension scanne et garde le DM qui repond — plus besoin
 # d'un build par environnement. Voir src/dm/config.json et src/dm/bootstrap.js.
 #
 # Les artefacts sont suffixes par la cible :
-#   dist/iassistant-direct-browser-${VERSION}-${TARGET}.crx
-#   dist/iassistant-direct-browser-${VERSION}-${TARGET}.xpi
+#   cible unique : dist/iassistant-direct-browser-${VERSION}-${TARGET}.crx
+#   mode --all   : dist/<target>/iassistant-direct-browser-${VERSION}-${TARGET}.crx
+# Surcharge possible du dossier de sortie via la variable d'env DIST_DIR.
 
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-DIST_DIR="$ROOT_DIR/dist"
+# DIST_DIR surchargeable par env (utilise par le mode --all pour isoler chaque cible).
+DIST_DIR="${DIST_DIR:-$ROOT_DIR/dist}"
 EXT_DIR="$DIST_DIR/extension"
+# Chemin relatif (affichage) : reflete le vrai dossier, y compris en mode --all (dist/<target>).
+DIST_REL="${DIST_DIR#"$ROOT_DIR"/}"
 VERSION=$(python3 -c "import json; print(json.load(open('$ROOT_DIR/manifest.json'))['version'])")
+
+# ──────────────────────────────────────────────
+# Mode --all : build chaque cible dans son propre dossier dist/<target>/
+# (re-invoque ce script par cible avec DIST_DIR isole ; aucune ne s'ecrase).
+# ──────────────────────────────────────────────
+ALL_TARGETS="prod int local"
+if [[ " $* " == *" --all "* ]]; then
+  PASSTHRU=()
+  for a in "$@"; do
+    case "$a" in --all|--target=*) ;; *) PASSTHRU+=("$a") ;; esac
+  done
+  echo "Building ALL profiles ($ALL_TARGETS) — un dossier par cible..."
+  for t in $ALL_TARGETS; do
+    echo ""
+    echo "==================== target=$t ===================="
+    DIST_DIR="$ROOT_DIR/dist/$t" "$0" --target="$t" ${PASSTHRU[@]+"${PASSTHRU[@]}"}
+  done
+  echo ""
+  echo "========================================="
+  echo " Tous les profils construits :"
+  for t in $ALL_TARGETS; do echo "   dist/$t/"; done
+  echo "========================================="
+  exit 0
+fi
 
 # ──────────────────────────────────────────────
 # Parse --target
@@ -35,8 +66,9 @@ done
 # En prod la liste bootstrap_urls (config.json) fait foi ; on bake le primaire ici.
 case "$TARGET" in
   prod)   PROFILE="prod" ; BOOTSTRAP_URL="https://bootstrap.apps.ocpbm02s2.cores.r2.pi2.minint.fr" ;;
+  int)    PROFILE="int"  ; BOOTSTRAP_URL="https://bootstrap.fake-domain.name" ;;
   local)  PROFILE="dev"  ; BOOTSTRAP_URL="http://localhost:8089" ;;
-  *)      echo "ERREUR: target inconnue '$TARGET' (attendu: prod|local)" >&2 ; exit 1 ;;
+  *)      echo "ERREUR: target inconnue '$TARGET' (attendu: prod|int|local, ou --all)" >&2 ; exit 1 ;;
 esac
 
 echo "Building MirAI Recorder v$VERSION (target=$TARGET, profile=$PROFILE)..."
@@ -128,7 +160,7 @@ PYEOF
 # ──────────────────────────────────────────────
 # 3. Verification
 # ──────────────────────────────────────────────
-echo "Fichiers dans dist/extension/ :"
+echo "Fichiers dans ${DIST_REL}/extension/ :"
 find "$EXT_DIR" -type f | sed "s|$EXT_DIR/||" | sort | while read f; do
   echo "  $f"
 done
@@ -187,7 +219,7 @@ if [[ " $* " == *" --crx "* ]]; then
   if [ -f "${EXT_DIR}.crx" ]; then
     mv "${EXT_DIR}.crx" "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.crx"
     CRX_SIZE=$(du -h "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.crx" | cut -f1)
-    echo "  OK  dist/iassistant-direct-browser-${VERSION}-${TARGET}.crx ($CRX_SIZE)"
+    echo "  OK  ${DIST_REL}/iassistant-direct-browser-${VERSION}-${TARGET}.crx ($CRX_SIZE)"
   else
     echo "  ERREUR: CRX non genere"
   fi
@@ -201,7 +233,7 @@ if [[ " $* " == *" --xpi "* ]]; then
   echo "Packaging XPI..."
   (cd "$EXT_DIR" && zip -r -q "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.xpi" .)
   XPI_SIZE=$(du -h "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.xpi" | cut -f1)
-  echo "  OK  dist/iassistant-direct-browser-${VERSION}-${TARGET}.xpi ($XPI_SIZE)"
+  echo "  OK  ${DIST_REL}/iassistant-direct-browser-${VERSION}-${TARGET}.xpi ($XPI_SIZE)"
 fi
 
 # ──────────────────────────────────────────────
@@ -211,10 +243,10 @@ echo ""
 echo "========================================="
 echo " Build MirAI Recorder v$VERSION (target=$TARGET)"
 echo "========================================="
-echo " dist/extension/                         → extension non empaquetee"
+echo " ${DIST_REL}/extension/                  → extension non empaquetee"
 echo "                                           (chargeable dans chrome://extensions)"
-[ -f "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.crx" ] && echo " dist/iassistant-direct-browser-${VERSION}-${TARGET}.crx → Chrome signe"
-[ -f "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.xpi" ] && echo " dist/iassistant-direct-browser-${VERSION}-${TARGET}.xpi → Firefox"
+[ -f "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.crx" ] && echo " ${DIST_REL}/iassistant-direct-browser-${VERSION}-${TARGET}.crx → Chrome signe"
+[ -f "$DIST_DIR/iassistant-direct-browser-${VERSION}-${TARGET}.xpi" ] && echo " ${DIST_REL}/iassistant-direct-browser-${VERSION}-${TARGET}.xpi → Firefox"
 echo ""
 echo " Contenu DM inclus :"
 echo "   src/dm/dm-config.json → template DM (placeholders, uploade au catalogue)"
