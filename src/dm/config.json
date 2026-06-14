@@ -70,5 +70,16 @@
     "apiBase": "https://compte-rendu.mirai.interieur.gouv.fr/api",
     "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
     "comuUrl": "https://webconf.comu.din.gouv.fr/"
+  },
+  "prod-onprem": {
+    "_description": "Build cible on-premise (cluster OpenShift ocpbm02s2). Config runtime servie par le DM sous ?profile=prod ; valeurs ci-dessous = fallback si DM injoignable.",
+    "bootstrap_url": "https://bootstrap.apps.ocpbm02s2.cores.r2.pi2.minint.fr",
+    "config_path": "/config/iassistant-direct-browser/config.json?profile=prod",
+    "keycloakIssuerUrl": "https://sso.mirai.interieur.gouv.fr/",
+    "keycloakRealm": "mirai",
+    "keycloakClientId": "mirai-extension",
+    "apiBase": "https://compte-rendu.mirai.interieur.gouv.fr/api",
+    "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
+    "comuUrl": "https://webconf.comu.gouv.fr/"
   }
 }

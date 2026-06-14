@@ -30,7 +30,8 @@ done
 case "$TARGET" in
   scaleway) PROFILE="prod-scaleway" ; TARGET_BOOTSTRAP="https://bootstrap.fake-domain.name" ;;
   dgx)      PROFILE="prod-dgx"      ; TARGET_BOOTSTRAP="https://onyxia.gpu.minint.fr/bootstrap" ;;
-  *) echo "ERROR: unknown target '$TARGET' (expected: scaleway|dgx)" >&2 ; exit 1 ;;
+  onprem)   PROFILE="prod-onprem"   ; TARGET_BOOTSTRAP="https://bootstrap.apps.ocpbm02s2.cores.r2.pi2.minint.fr" ;;
+  *) echo "ERROR: unknown target '$TARGET' (expected: scaleway|dgx|onprem)" >&2 ; exit 1 ;;
 esac
 
 # ──────────────────────────────────────────────

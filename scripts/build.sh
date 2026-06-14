@@ -4,6 +4,7 @@
 #   scripts/build.sh                              → build Scaleway (defaut)
 #   scripts/build.sh --target=dgx                 → build DGX
 #   scripts/build.sh --target=scaleway            → build Scaleway (explicite)
+#   scripts/build.sh --target=onprem              → build on-premise (OpenShift ocpbm02s2)
 #   scripts/build.sh --target=local               → build DM local (localhost:8089)
 #   scripts/build.sh --target=dgx --crx --xpi     → DGX + .crx signe + .xpi
 #
@@ -31,8 +32,9 @@ done
 case "$TARGET" in
   scaleway) PROFILE="prod-scaleway" ; BOOTSTRAP_URL="https://bootstrap.fake-domain.name" ;;
   dgx)      PROFILE="prod-dgx"      ; BOOTSTRAP_URL="https://onyxia.gpu.minint.fr/bootstrap" ;;
+  onprem)   PROFILE="prod-onprem"   ; BOOTSTRAP_URL="https://bootstrap.apps.ocpbm02s2.cores.r2.pi2.minint.fr" ;;
   local)    PROFILE="dev"           ; BOOTSTRAP_URL="http://localhost:8089" ;;
-  *)        echo "ERREUR: target inconnue '$TARGET' (attendu: scaleway|dgx|local)" >&2 ; exit 1 ;;
+  *)        echo "ERREUR: target inconnue '$TARGET' (attendu: scaleway|dgx|onprem|local)" >&2 ; exit 1 ;;
 esac
 
 echo "Building MirAI Recorder v$VERSION (target=$TARGET, profile=$PROFILE)..."
