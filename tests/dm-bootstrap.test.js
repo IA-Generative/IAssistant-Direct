@@ -265,6 +265,23 @@ describe('DMBootstrap', () => {
     });
   });
 
+  describe('getConfigAsync() — relit le dmConfig persiste (fix issuer service worker)', () => {
+    test('retourne l issuer SERVI par le DM (storage), pas le fallback sso.mirai', async () => {
+      // Simule le service worker : _configCache vide (instance fraiche), pas de
+      // _readLocalConfig possible (XHR KO en SW). La seule source fiable = le
+      // dmConfig persiste par le login. getConfigAsync() doit le relire.
+      __seedChromeStorage({
+        dmConfig: {
+          keycloakIssuerUrl: 'https://sso.dm-servi.example/realms/onprem',
+          keycloakRealm: 'onprem'
+        }
+      });
+      const cfg = await window.DMBootstrap.getConfigAsync();
+      expect(cfg.keycloakIssuerUrl).toBe('https://sso.dm-servi.example/realms/onprem');
+      expect(cfg.keycloakIssuerUrl).not.toContain('sso.mirai.interieur.gouv.fr');
+    });
+  });
+
   describe('masquage des creds', () => {
     test('maskValue garde les premiers caracteres', () => {
       expect(window.DMBootstrap.maskValue('s3cr3t-value-1234', 4)).toMatch(/^s3cr•+$/);
