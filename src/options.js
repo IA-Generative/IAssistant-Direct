@@ -207,3 +207,121 @@ document.addEventListener('DOMContentLoaded', () => {
   if (comu) comu.addEventListener('click', () => openMiraiShortcut('comu'));
   if (visio) visio.addEventListener('click', () => openMiraiShortcut('visio'));
 });
+
+// ======================================================================
+// 🖧 Gestion des serveurs Device Management (liste, test, préféré)
+// ======================================================================
+(function initDMSection() {
+  const listEl = document.getElementById('dm-list');
+  if (!listEl || !window.DMBootstrap) return; // page sans la section (popup)
+
+  const testBtn = document.getElementById('dm-test');
+  const savePrefBtn = document.getElementById('dm-save-pref');
+  const statusEl = document.getElementById('dm-status');
+  const configBody = document.getElementById('dm-config-body');
+
+  const DM = window.DMBootstrap;
+  let badges = {}; // url -> badge element
+
+  function setBadge(el, cls, text) {
+    el.className = 'dm-badge ' + cls;
+    el.textContent = text;
+  }
+
+  async function renderList() {
+    const urls = DM.getBootstrapUrls();
+    const preferred = await DM.getPreferred();
+    listEl.textContent = '';
+    badges = {};
+
+    urls.forEach((url, i) => {
+      const row = document.createElement('div');
+      row.className = 'dm-row';
+
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'dm-pref';
+      radio.value = url;
+      radio.id = 'dm-pref-' + i;
+      if (preferred ? url === preferred : i === 0) radio.checked = true;
+      radio.addEventListener('change', () => { savePrefBtn.disabled = false; });
+
+      const label = document.createElement('label');
+      label.htmlFor = radio.id;
+      const role = (i === 0) ? 'Primaire' : 'Secours ' + i;
+      const star = (url === preferred) ? ' ★ préféré' : '';
+      const code = document.createElement('code');
+      code.textContent = url;
+      label.append(role + ' — ', code, document.createTextNode(star));
+
+      const badge = document.createElement('span');
+      setBadge(badge, 'unknown', 'non testé');
+      badges[url] = badge;
+
+      row.append(radio, label, badge);
+      listEl.appendChild(row);
+    });
+
+    savePrefBtn.disabled = true;
+  }
+
+  async function testDMs() {
+    testBtn.disabled = true;
+    statusEl.textContent = 'Test en cours…';
+    Object.values(badges).forEach((b) => setBadge(b, 'pending', '…'));
+    try {
+      const results = await DM.probeAll();
+      results.forEach((r) => {
+        const b = badges[r.url];
+        if (!b) return;
+        if (r.ok) setBadge(b, 'ok', `✓ ${r.ms} ms`);
+        else setBadge(b, 'ko', r.error === 'timeout' ? '✗ timeout' : '✗ injoignable');
+      });
+      const okCount = results.filter((r) => r.ok).length;
+      statusEl.textContent = `${okCount}/${results.length} serveur(s) répondent.`;
+    } catch (e) {
+      statusEl.textContent = 'Erreur pendant le test.';
+      console.warn('[MirAI DM] probeAll error:', e.message);
+    } finally {
+      testBtn.disabled = false;
+    }
+  }
+
+  async function savePreferred() {
+    const checked = listEl.querySelector('input[name="dm-pref"]:checked');
+    if (!checked) return;
+    const ok = await DM.setPreferred(checked.value);
+    statusEl.textContent = ok ? 'Serveur préféré enregistré.' : 'Échec de l’enregistrement.';
+    savePrefBtn.disabled = true;
+    await renderList();
+  }
+
+  async function renderActiveConfig() {
+    try {
+      const cfg = await DM.getConfigAsync();
+      const masked = DM.maskConfig(cfg);
+      const table = document.createElement('table');
+      Object.keys(masked).sort().forEach((k) => {
+        const tr = document.createElement('tr');
+        const tdK = document.createElement('td');
+        tdK.textContent = k;
+        const tdV = document.createElement('td');
+        const code = document.createElement('code');
+        code.textContent = String(masked[k]);
+        tdV.appendChild(code);
+        tr.append(tdK, tdV);
+        table.appendChild(tr);
+      });
+      configBody.textContent = '';
+      configBody.appendChild(table);
+    } catch (e) {
+      configBody.textContent = 'Config indisponible.';
+    }
+  }
+
+  if (testBtn) testBtn.addEventListener('click', testDMs);
+  if (savePrefBtn) savePrefBtn.addEventListener('click', savePreferred);
+
+  renderList();
+  renderActiveConfig();
+})();

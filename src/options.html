@@ -31,6 +31,29 @@
       margin-top: 0;
     }
 
+    /* ── Section Device Management ── */
+    #dm-section { margin-top: 22px; border-top: 1px solid #eee; padding-top: 14px; }
+    #dm-section h3 { margin-bottom: 8px; }
+    .dm-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
+    .dm-row label { font-weight: 400; width: auto; text-align: left; cursor: pointer; flex: 1;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dm-row code { font-size: 12px; color: #333; }
+    .dm-badge { font-size: 11px; padding: 1px 7px; border-radius: 10px; white-space: nowrap; }
+    .dm-badge.ok { background: #e3f6e5; color: #1a7f37; }
+    .dm-badge.ko { background: #fde7e9; color: #b3261e; }
+    .dm-badge.pending { background: #eef; color: #556; }
+    .dm-badge.unknown { background: #f0f0f0; color: #777; }
+    .dm-actions { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
+    #dm-status { font-size: 12px; color: #666; }
+    #dm-config { margin-top: 12px; font-size: 12px; }
+    #dm-config summary { cursor: pointer; color: #0078d7; }
+    #dm-config table { border-collapse: collapse; margin-top: 6px; }
+    #dm-config td { padding: 2px 10px 2px 0; vertical-align: top; }
+    #dm-config td:first-child { color: #555; font-weight: 600; }
+    #dm-config td code { color: #111; }
+    button.dm-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid #ccc;
+      background: #f7f7f7; cursor: pointer; }
+    button.dm-btn:disabled { opacity: .5; cursor: default; }
   </style>
 </head>
 <body>
@@ -54,6 +77,24 @@
       <button id="save" type="button">Enregistrer</button>
     </div>
   </form>
+
+  <section id="dm-section">
+    <h3>Serveur Device Management</h3>
+    <p style="font-size:12px; color:#555; margin:0 0 8px;">
+      Le plug-in tente les serveurs dans l'ordre et utilise le premier qui répond.
+      Vous pouvez tester leur disponibilité et fixer votre serveur préféré.
+    </p>
+    <div class="dm-actions">
+      <button id="dm-test" class="dm-btn" type="button">Tester les serveurs</button>
+      <button id="dm-save-pref" class="dm-btn" type="button" disabled>Enregistrer le préféré</button>
+      <span id="dm-status"></span>
+    </div>
+    <div id="dm-list"><!-- liste remplie dynamiquement --></div>
+    <details id="dm-config">
+      <summary>Config active (valeurs sensibles masquées)</summary>
+      <div id="dm-config-body"></div>
+    </details>
+  </section>
 
   <script src="crypto.js"></script>
   <script src="compat.js"></script>

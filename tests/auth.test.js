@@ -100,7 +100,7 @@ describe('MiraiAuth', () => {
       delete window.DMBootstrap;
       const cfg = window.MiraiAuth._getAuthConfig();
       expect(cfg.issuerUrl).toBe('https://sso.mirai.interieur.gouv.fr/realms/mirai');
-      expect(cfg.clientId).toBe('bootstrap-iassistant');
+      expect(cfg.clientId).toBe('mirai-extension');
     });
   });
 
@@ -270,7 +270,7 @@ describe('MiraiAuth', () => {
 
       // Verify enrollment body uses LibreOffice convention
       const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-      expect(body.device_name).toBe('mirai-browser');
+      expect(body.device_name).toBe('iassistant-direct-browser');
       expect(body.plugin_uuid).toBe('client-uuid-xyz');
 
       const storage = __getChromeStorage();
