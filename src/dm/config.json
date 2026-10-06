@@ -11,7 +11,9 @@
     "telemetryAuthorizationType": "Bearer",
     "authHeaderName": "Authorization",
     "authHeaderPrefix": "Bearer ",
-    "allowedKeywords": ["webconf", "visio", "comu", "webinaire", "webex", "gmeet", "teams"]
+    "allowedKeywords": ["webconf", "visio", "comu", "webinaire", "webex", "gmeet", "teams"],
+    "mesagentsBaseUrl": "",
+    "features": { "agents": true }
   },
   "dev": {
     "_description": "Dev avec DM Docker Compose local",
@@ -45,7 +47,9 @@
     "resumeUrl": "https://resume.mirai.interieur.gouv.fr/",
     "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
     "aideUrl": "https://mirai.interieur.gouv.fr/aide",
-    "comuUrl": "https://webconf.comu.gouv.fr/"
+    "comuUrl": "https://webconf.comu.gouv.fr/",
+    "mesagentsBaseUrl": "${{MESAGENTS_BASE_URL}}",
+    "features": { "agents": true }
   },
   "prod": {
     "_description": "Production generique — chaque DM (DGX/Scaleway) resout ses propres valeurs via ses variables d'env. C'est le profil servi au runtime (?profile=prod).",
@@ -58,7 +62,9 @@
     "chatUrl": "https://chat.mirai.interieur.gouv.fr/",
     "resumeUrl": "https://resume.mirai.interieur.gouv.fr/",
     "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
-    "aideUrl": "https://mirai.interieur.gouv.fr/aide"
+    "aideUrl": "https://mirai.interieur.gouv.fr/aide",
+    "mesagentsBaseUrl": "${{MESAGENTS_BASE_URL}}",
+    "features": { "agents": true }
   },
   "prod-scaleway": {
     "_description": "Build cible Scaleway (cloud). Config runtime servie par le DM sous ?profile=prod ; valeurs ci-dessous = fallback si DM injoignable.",
@@ -74,7 +80,8 @@
     "resumeUrl": "https://resume.mirai.interieur.gouv.fr/",
     "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
     "aideUrl": "https://mirai.interieur.gouv.fr/aide",
-    "comuUrl": "https://webconf.comu.gouv.fr/"
+    "comuUrl": "https://webconf.comu.gouv.fr/",
+    "mesagentsBaseUrl": ""
   },
   "prod-dgx": {
     "_description": "Build cible DGX (onyxia). Keycloak/mcr en acces DIRECT (egress navigateur ouvert). Config runtime servie par le DM sous ?profile=prod ; valeurs ci-dessous = fallback si DM injoignable.",
@@ -90,6 +97,7 @@
     "resumeUrl": "https://resume.mirai.interieur.gouv.fr/",
     "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
     "aideUrl": "https://mirai.interieur.gouv.fr/aide",
-    "comuUrl": "https://webconf.comu.din.gouv.fr/"
+    "comuUrl": "https://webconf.comu.din.gouv.fr/",
+    "mesagentsBaseUrl": ""
   }
 }

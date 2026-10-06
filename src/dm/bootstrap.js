@@ -23,7 +23,9 @@ globalThis.DMBootstrap = {
     comuUrl: 'https://webconf.comu.gouv.fr/',
     portal_url: 'https://mirai.interieur.gouv.fr',
     allowedKeywords: ['webconf', 'visio', 'comu', 'webinaire', 'webex', 'gmeet', 'teams'],
-    telemetryEnabled: true
+    telemetryEnabled: true,
+    // Contrat d'agents MirAI : vide = fonction « Agents » invisible (servie par le DM).
+    mesagentsBaseUrl: ''
   },
 
   /**
@@ -175,9 +177,10 @@ globalThis.DMBootstrap = {
     }
   },
 
+  /** Flags de fonctionnalités servis par le DM (ex. `features.agents`). */
   getFeatures() {
     const cfg = this.getConfig();
-    return cfg.features || {};
+    return (cfg.features && typeof cfg.features === 'object') ? cfg.features : {};
   },
 
   async init(bootstrapUrl) {
