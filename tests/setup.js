@@ -1,6 +1,41 @@
 // tests/setup.js — Chrome Extension API mocks for Jest/jsdom
 
 const storageData = {};
+const sessionData = {};
+
+// Fabrique une zone de stockage (local / session) partageant la meme semantique.
+function makeStorageArea(data) {
+  return {
+    get: jest.fn((keys, cb) => {
+      let result = {};
+      if (typeof keys === 'string') {
+        result[keys] = data[keys] || undefined;
+      } else if (Array.isArray(keys)) {
+        keys.forEach(k => { result[k] = data[k] || undefined; });
+      } else if (keys === null || keys === undefined) {
+        result = { ...data };
+      } else {
+        // Object with defaults
+        for (const [k, def] of Object.entries(keys || {})) {
+          result[k] = data[k] !== undefined ? data[k] : def;
+        }
+      }
+      if (cb) cb(result);
+      return Promise.resolve(result);
+    }),
+    set: jest.fn((items, cb) => {
+      Object.assign(data, items);
+      if (cb) cb();
+      return Promise.resolve();
+    }),
+    remove: jest.fn((keys, cb) => {
+      const toRemove = Array.isArray(keys) ? keys : [keys];
+      toRemove.forEach(k => delete data[k]);
+      if (cb) cb();
+      return Promise.resolve();
+    })
+  };
+}
 
 const chromeMock = {
   runtime: {
@@ -17,43 +52,17 @@ const chromeMock = {
     onMessage: {
       addListener: jest.fn()
     },
+    onStartup: {
+      addListener: jest.fn()
+    },
     lastError: null
   },
 
   storage: {
-    local: {
-      get: jest.fn((keys, cb) => {
-        if (typeof keys === 'string') {
-          const result = {};
-          result[keys] = storageData[keys] || undefined;
-          if (cb) cb(result);
-          return Promise.resolve(result);
-        }
-        if (Array.isArray(keys)) {
-          const result = {};
-          keys.forEach(k => { result[k] = storageData[k] || undefined; });
-          if (cb) cb(result);
-          return Promise.resolve(result);
-        }
-        // Object with defaults
-        const result = {};
-        for (const [k, def] of Object.entries(keys || {})) {
-          result[k] = storageData[k] !== undefined ? storageData[k] : def;
-        }
-        if (cb) cb(result);
-        return Promise.resolve(result);
-      }),
-      set: jest.fn((items, cb) => {
-        Object.assign(storageData, items);
-        if (cb) cb();
-        return Promise.resolve();
-      }),
-      remove: jest.fn((keys, cb) => {
-        const toRemove = Array.isArray(keys) ? keys : [keys];
-        toRemove.forEach(k => delete storageData[k]);
-        if (cb) cb();
-        return Promise.resolve();
-      })
+    local: makeStorageArea(storageData),
+    session: makeStorageArea(sessionData),
+    onChanged: {
+      addListener: jest.fn()
     }
   },
 
@@ -65,7 +74,28 @@ const chromeMock = {
   },
 
   notifications: {
-    create: jest.fn()
+    create: jest.fn(),
+    clear: jest.fn(),
+    onClicked: {
+      addListener: jest.fn()
+    }
+  },
+
+  // Contrat d'agents MirAI : menus contextuels, lecture de la page, ouverture du popup
+  contextMenus: {
+    create: jest.fn((props, cb) => { if (cb) cb(); return props.id; }),
+    removeAll: jest.fn(() => Promise.resolve()),
+    onClicked: {
+      addListener: jest.fn()
+    }
+  },
+
+  scripting: {
+    executeScript: jest.fn(() => Promise.resolve([{ result: undefined }]))
+  },
+
+  action: {
+    openPopup: jest.fn(() => Promise.resolve())
   },
 
   tabs: {
@@ -87,7 +117,14 @@ global.navigator = global.navigator || {};
 // Helper: reset storage between tests
 global.__resetChromeStorage = () => {
   Object.keys(storageData).forEach(k => delete storageData[k]);
+  Object.keys(sessionData).forEach(k => delete sessionData[k]);
 };
+
+// Helper: seed/read session storage (contrat d'agents : cache + resultat)
+global.__seedSessionStorage = (data) => {
+  Object.assign(sessionData, data);
+};
+global.__getSessionStorage = () => ({ ...sessionData });
 
 // Helper: seed storage for tests
 global.__seedChromeStorage = (data) => {

@@ -1,12 +1,19 @@
 // background.js — service worker (pas de DOM ici)
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
-// Import crypto.js (TokenStore) FIRST — recording.js et les handlers token en dépendent.
-try { importScripts('crypto.js'); } catch (e) { console.warn('[MirAI] importScripts crypto.js:', e.message); }
-// Import DMBootstrap (client config DM) — source unique de la config (issuer/realm…)
-try { importScripts('dm/bootstrap.js'); } catch (e) { console.warn('[MirAI] importScripts bootstrap.js:', e.message); }
-// Import recording.js functions (shared with popup)
-try { importScripts('recording.js'); } catch (e) { console.warn('[MirAI] importScripts recording.js:', e.message); }
+// Chrome (service worker) : les modules partagés sont importés ici.
+// Firefox ESR (pas de service worker) : ils sont listés dans manifest `background.scripts`
+// AVANT background.js, et importScripts n'existe pas dans une page d'arrière-plan.
+if (typeof importScripts === 'function') {
+  // Import crypto.js (TokenStore) FIRST — recording.js et les handlers token en dépendent.
+  try { importScripts('crypto.js'); } catch (e) { console.warn('[MirAI] importScripts crypto.js:', e.message); }
+  // Import DMBootstrap (client config DM) — source unique de la config (issuer/realm…)
+  try { importScripts('dm/bootstrap.js'); } catch (e) { console.warn('[MirAI] importScripts bootstrap.js:', e.message); }
+  // Import recording.js functions (shared with popup)
+  try { importScripts('recording.js'); } catch (e) { console.warn('[MirAI] importScripts recording.js:', e.message); }
+  // Import mesagents.js (contrat d'agents MirAI : liste + lancement)
+  try { importScripts('mesagents.js'); } catch (e) { console.warn('[MirAI] importScripts mesagents.js:', e.message); }
+}
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
@@ -94,12 +101,18 @@ api.alarms.onAlarm.addListener(async (alarm) => {
 // ======================================================================
 // Token refresh helper (used by overlay handlers)
 // ======================================================================
-async function _ensureTokenFresh() {
+/**
+ * Garantit un jeton d'accès frais (rafraîchissement silencieux si expiré).
+ * @param {{force?: boolean}} options - force : rafraîchit même si non expiré (401 reçu).
+ * @returns {Promise<object>} le token déchiffré {access_token, refresh_token, expires_in}
+ */
+async function _ensureTokenFresh(options = {}) {
   let miraiToken = await TokenStore.getToken();
   if (!miraiToken?.access_token) throw new Error('Non connecte (SSO)');
 
-  if (miraiToken.expires_in < Date.now() && miraiToken.refresh_token) {
-    console.info('[MirAI] Token expired, refreshing...');
+  const doitRafraichir = !!options.force || miraiToken.expires_in < Date.now();
+  if (doitRafraichir && miraiToken.refresh_token) {
+    console.info('[MirAI] Token expired or refresh forced, refreshing...');
     // Config via DMBootstrap (cache/local/fallback — tous avec realm).
     let dmConfig = {};
     try { dmConfig = DMBootstrap.getConfig(); } catch (_) {}
@@ -134,6 +147,7 @@ async function _ensureTokenFresh() {
       throw new Error('Refresh token echoue');
     }
   }
+  return miraiToken;
 }
 
 // Store pending PKCE state
@@ -380,10 +394,15 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(challengeBuffer)))
           .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
+        // Portée : + `mesagents-agents` (audience Mes agents) si la fonction Agents est active.
+        const scope = (typeof MesAgents !== 'undefined' && MesAgents.buildScope)
+          ? MesAgents.buildScope('openid profile email offline_access', dmConfig)
+          : 'openid profile email offline_access';
+
         const authUrl = `${authBase}/protocol/openid-connect/auth?` + new URLSearchParams({
           client_id: clientId,
           response_type: 'code',
-          scope: 'openid profile email offline_access',
+          scope: scope,
           redirect_uri: callbackUrl,
           code_challenge: codeChallenge,
           code_challenge_method: 'S256',
@@ -406,3 +425,250 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 });
+
+// ======================================================================
+// Agents MirAI — menus contextuels + lancement (contrat d'agents MirAI)
+// ======================================================================
+// Un menu « Agents MirAI » (contexte sélection ou page) liste les agents accessibles
+// à la personne ; le clic lit la sélection (ou titre + URL + texte principal de la
+// page, borné) et lance l'agent. Le résultat est publié dans storage.session
+// (`mesagentsResultat`) : le popup l'affiche (ouvert par programme si possible,
+// sinon notification). Rien du contenu ni du jeton n'est journalisé.
+const MENU_AGENTS_PARENT = 'mirai-agents';
+const MENU_AGENT_PREFIXE = 'mirai-agent:';
+const ALARME_AGENTS = 'mesagents-refresh';
+const CLE_RESULTAT_AGENTS = 'mesagentsResultat';
+const MAX_CONTENU_PAGE = 20000;
+const MAX_TITRE_MENU = 60;
+
+function _agentsDisponibles() {
+  return typeof MesAgents !== 'undefined' && !!api.contextMenus;
+}
+
+function _storeSession() {
+  return api.storage.session || api.storage.local;
+}
+
+if (typeof MesAgents !== 'undefined' && MesAgents.setAuth) {
+  // Le background rafraîchit lui-même le jeton (pas de MiraiAuth hors popup).
+  MesAgents.setAuth({
+    async obtenirJeton(forcer) {
+      try {
+        const t = await _ensureTokenFresh({ force: forcer });
+        return t?.access_token || null;
+      } catch (e) {
+        return null;
+      }
+    }
+  });
+}
+
+function _titreMenu(nom) {
+  let t = String(nom || '').replace(/\s+/g, ' ').trim();
+  if (t.length > MAX_TITRE_MENU) t = t.slice(0, MAX_TITRE_MENU - 1) + '…';
+  return t.replace(/&/g, '&&'); // `&` est un accélérateur dans les menus Chrome/Windows
+}
+
+function _creerMenu(props) {
+  try {
+    api.contextMenus.create(props, () => { void api.runtime.lastError; });
+  } catch (e) {
+    console.warn('[MirAI Agents] contextMenus.create:', e.message);
+  }
+}
+
+/**
+ * (Re)construit le menu « Agents MirAI » : un sous-menu par agent, dans les contextes
+ * qu'il accepte (`selection` → inputs ∋ selection, `page` → inputs ∋ page).
+ * Aucun menu si la fonction est inactive, la personne déconnectée ou le service injoignable.
+ */
+async function reconstruireMenusAgents(options = {}) {
+  if (!_agentsDisponibles()) return;
+  try { await api.contextMenus.removeAll(); } catch (e) { /* rien à retirer */ }
+
+  // Relit la config DM stockée (le service worker ne survit pas entre deux réveils).
+  try { if (typeof DMBootstrap !== 'undefined' && DMBootstrap._loadCachedOrFallback) await DMBootstrap._loadCachedOrFallback(); } catch (e) { /* fallback */ }
+
+  let agents = [];
+  try {
+    agents = await MesAgents.listerAgents({ force: !!options.force });
+  } catch (e) {
+    if (!e?.masquer) console.warn('[MirAI Agents] Liste indisponible :', e?.code || e?.message);
+    return;
+  }
+
+  const eligibles = agents
+    .map(a => ({ a, contexts: ['selection', 'page'].filter(c => a.inputs.includes(c)) }))
+    .filter(x => x.contexts.length > 0);
+  if (eligibles.length === 0) return;
+
+  const contextesParent = Array.from(new Set(eligibles.flatMap(x => x.contexts)));
+  _creerMenu({ id: MENU_AGENTS_PARENT, title: 'Agents MirAI', contexts: contextesParent });
+  for (const { a, contexts } of eligibles) {
+    _creerMenu({ id: MENU_AGENT_PREFIXE + a.id, parentId: MENU_AGENTS_PARENT, title: _titreMenu(a.name), contexts });
+  }
+  console.info(`[MirAI Agents] Menu construit : ${eligibles.length} agent(s).`);
+}
+
+async function _publierResultatAgent(resultat) {
+  try {
+    await _storeSession().set({ [CLE_RESULTAT_AGENTS]: Object.assign({ ts: Date.now() }, resultat) });
+  } catch (e) {
+    console.warn('[MirAI Agents] Publication du résultat impossible :', e.message);
+  }
+}
+
+/** Ouvre le popup par programme (Chrome ≥ 127, Firefox ≥ 106) ; false si impossible. */
+async function _ouvrirPopup(tab) {
+  try {
+    if (!api.action?.openPopup) return false;
+    const details = tab?.windowId !== undefined ? { windowId: tab.windowId } : undefined;
+    await api.action.openPopup(details);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Exécutée DANS la page : doit rester autonome (sérialisée par scripting.executeScript).
+function _extraireSelectionDansPage() {
+  try { return String(window.getSelection ? window.getSelection().toString() : ''); } catch (e) { return ''; }
+}
+
+function _extrairePageDansPage(max) {
+  try {
+    const racine = document.querySelector('main, article, [role="main"]') || document.body;
+    const texte = String((racine && racine.innerText) || '').replace(/\n{3,}/g, '\n\n').trim();
+    return { title: String(document.title || ''), url: String(location.href || ''), text: texte.slice(0, max) };
+  } catch (e) {
+    return { title: String(document.title || ''), url: String(location.href || ''), text: '' };
+  }
+}
+
+async function _executerDansOnglet(tab, func, args) {
+  if (!api.scripting?.executeScript || tab?.id === undefined || tab.id < 0) return undefined;
+  try {
+    const res = await api.scripting.executeScript({ target: { tabId: tab.id }, func, args: args || [] });
+    return Array.isArray(res) && res[0] ? res[0].result : undefined;
+  } catch (e) {
+    return undefined; // page privilégiée, onglet fermé… → repli
+  }
+}
+
+async function _lireSelection(tab, info) {
+  const parScript = await _executerDansOnglet(tab, _extraireSelectionDansPage);
+  const texte = (typeof parScript === 'string' && parScript.trim()) ? parScript : String(info?.selectionText || '');
+  return texte.slice(0, MAX_CONTENU_PAGE);
+}
+
+async function _lirePage(tab) {
+  const page = await _executerDansOnglet(tab, _extrairePageDansPage, [MAX_CONTENU_PAGE]);
+  if (page && typeof page === 'object') return page;
+  return { title: String(tab?.title || ''), url: String(tab?.url || ''), text: '' };
+}
+
+async function lancerAgentDepuisMenu(agentId, info, tab, popupOuvertPromise) {
+  let agent = null;
+  try {
+    const agents = await MesAgents.listerAgents();
+    agent = agents.find(a => a.id === agentId) || null;
+  } catch (e) {
+    await _publierResultatAgent({ status: 'error', message: MesAgents.messageErreur(e), code: e?.code || 'erreur' });
+    return;
+  }
+  if (!agent) {
+    await _publierResultatAgent({ status: 'error', message: "Cet agent n'est plus accessible.", code: 'model_not_found' });
+    return;
+  }
+
+  const modeSelection = !!(info?.selectionText) && agent.inputs.includes('selection');
+  const fiche = { id: agent.id, name: agent.name };
+  await _publierResultatAgent({ status: 'pending', agent: fiche, mode: modeSelection ? 'selection' : 'page' });
+
+  let consigne, contenu;
+  if (modeSelection) {
+    contenu = await _lireSelection(tab, info);
+    consigne = 'Voici un passage sélectionné dans mon navigateur. Applique ta mission à ce passage.';
+  } else {
+    const page = await _lirePage(tab);
+    contenu = `Titre : ${page.title}\nAdresse : ${page.url}\n\n${page.text}`.slice(0, MAX_CONTENU_PAGE);
+    consigne = 'Voici la page web que je consulte (titre, adresse, texte principal). Applique ta mission à cette page.';
+  }
+
+  if (!contenu.trim()) {
+    await _publierResultatAgent({ status: 'error', agent: fiche, message: 'Rien à transmettre : la sélection ou la page est vide.', code: 'vide' });
+    return;
+  }
+
+  let resultat;
+  try {
+    const r = await MesAgents.lancerAgent({ model: agent.model, consigne, contenu });
+    resultat = { status: 'done', agent: fiche, texte: r.texte, tronque: !!r.tronque };
+  } catch (e) {
+    resultat = { status: 'error', agent: fiche, message: MesAgents.messageErreur(e), code: e?.code || 'erreur' };
+    if (e?.masquer) reconstruireMenusAgents().catch(() => {});
+  }
+  await _publierResultatAgent(resultat);
+
+  const popupOuvert = popupOuvertPromise ? await popupOuvertPromise : false;
+  if (!popupOuvert && api.notifications?.create) {
+    try {
+      api.notifications.create('mesagents-resultat', {
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: resultat.status === 'done' ? `Réponse de « ${agent.name} »` : `Agent « ${agent.name} »`,
+        message: resultat.status === 'done'
+          ? "La réponse est prête : cliquez sur l'icône IAssistant-Direct pour la lire."
+          : resultat.message
+      });
+    } catch (e) { /* notification facultative */ }
+  }
+}
+
+if (api.contextMenus?.onClicked) {
+  api.contextMenus.onClicked.addListener((info, tab) => {
+    const id = String(info?.menuItemId || '');
+    if (!id.startsWith(MENU_AGENT_PREFIXE) || !_agentsDisponibles()) return;
+    // Ouvre le popup dès le geste utilisateur ; le résultat lui parvient par storage.session.
+    const popupOuvert = _ouvrirPopup(tab);
+    lancerAgentDepuisMenu(id.slice(MENU_AGENT_PREFIXE.length), info, tab, popupOuvert)
+      .catch(e => console.warn('[MirAI Agents] Lancement échoué :', e?.message));
+  });
+}
+
+if (api.notifications?.onClicked) {
+  api.notifications.onClicked.addListener((notifId) => {
+    if (notifId !== 'mesagents-resultat') return;
+    _ouvrirPopup().then((ok) => { if (!ok) console.info('[MirAI Agents] Ouvrez le popup pour lire la réponse.'); });
+    try { api.notifications.clear(notifId); } catch (e) { /* ignore */ }
+  });
+}
+
+// Rafraîchissement : installation, démarrage du navigateur, toutes les 3 min, et à
+// chaque ouverture/fermeture de session (apparition/disparition du jeton chiffré).
+api.runtime.onInstalled.addListener(() => {
+  api.alarms.create(ALARME_AGENTS, { periodInMinutes: 3 });
+  reconstruireMenusAgents({ force: true }).catch(() => {});
+});
+
+if (api.runtime.onStartup) {
+  api.runtime.onStartup.addListener(() => {
+    reconstruireMenusAgents({ force: true }).catch(() => {});
+  });
+}
+
+api.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name !== ALARME_AGENTS) return;
+  reconstruireMenusAgents({ force: true }).catch(() => {});
+});
+
+if (api.storage.onChanged) {
+  api.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes.miraiToken) return;
+    const avant = changes.miraiToken.oldValue !== undefined;
+    const apres = changes.miraiToken.newValue !== undefined;
+    if (avant === apres) return; // simple rafraîchissement du jeton : rien à refaire
+    if (typeof MesAgents !== 'undefined') MesAgents.viderCache().catch(() => {});
+    reconstruireMenusAgents({ force: true }).catch(() => {});
+  });
+}

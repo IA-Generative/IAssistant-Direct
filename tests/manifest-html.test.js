@@ -34,6 +34,27 @@ describe('manifest.json', () => {
   test('background est un service worker', () => {
     expect(manifest.background.service_worker).toBe('src/background.js');
   });
+
+  // Contrat d'agents MirAI
+  test('contient les permissions contextMenus et scripting (menu « Agents MirAI », lecture de la page)', () => {
+    expect(manifest.permissions).toContain('contextMenus');
+    expect(manifest.permissions).toContain('scripting');
+  });
+
+  test('l\'hote de Mes agents est atteignable (<all_urls>)', () => {
+    expect(manifest.host_permissions).toContain('<all_urls>');
+  });
+
+  test('Firefox ESR : background.scripts liste les modules partages AVANT background.js', () => {
+    const scripts = manifest.background.scripts;
+    expect(Array.isArray(scripts)).toBe(true);
+    expect(scripts[scripts.length - 1]).toBe('src/background.js');
+    for (const dep of ['src/crypto.js', 'src/dm/bootstrap.js', 'src/recording.js', 'src/mesagents.js']) {
+      expect(scripts.indexOf(dep)).toBeGreaterThan(-1);
+      expect(scripts.indexOf(dep)).toBeLessThan(scripts.length - 1);
+    }
+    for (const f of scripts) expect(fs.existsSync(path.join(__dirname, '..', f))).toBe(true);
+  });
 });
 
 describe('dm/config.json', () => {
@@ -107,6 +128,21 @@ describe('dm/config.json', () => {
       ['webconf', 'visio', 'comu', 'webinaire', 'webex', 'gmeet', 'teams']
     );
   });
+
+  // Contrat d'agents MirAI : cle DM + flag de fonctionnalite
+  test('mesagentsBaseUrl : placeholder DM dans les profils servis (int, prod), vide dans les replis', () => {
+    expect(config.int.mesagentsBaseUrl).toBe('${{MESAGENTS_BASE_URL}}');
+    expect(config.prod.mesagentsBaseUrl).toBe('${{MESAGENTS_BASE_URL}}');
+    expect(config.default.mesagentsBaseUrl).toBe('');
+    expect(config['prod-scaleway'].mesagentsBaseUrl).toBe('');
+    expect(config['prod-dgx'].mesagentsBaseUrl).toBe('');
+  });
+
+  test('features.agents est declare (default + profils servis)', () => {
+    expect(config.default.features).toEqual({ agents: true });
+    expect(config.prod.features).toEqual({ agents: true });
+    expect(config.int.features).toEqual({ agents: true });
+  });
 });
 
 describe('dm/manifest.json', () => {
@@ -159,6 +195,27 @@ describe('popup.html', () => {
     expect(html).toContain('id="dm-update-version"');
     expect(html).toContain('id="dm-update-link"');
     expect(html).toContain('id="dm-update-dismiss"');
+  });
+
+  // Contrat d'agents MirAI
+  test('charge mesagents.js puis popup-agents.js apres auth.js et avant popup.js', () => {
+    const authIdx = html.indexOf('<script src="auth.js">');
+    const maIdx = html.indexOf('<script src="mesagents.js">');
+    const paIdx = html.indexOf('<script src="popup-agents.js">');
+    const popupIdx = html.indexOf('<script src="popup.js">');
+    expect(authIdx).toBeGreaterThan(-1);
+    expect(maIdx).toBeGreaterThan(authIdx);
+    expect(paIdx).toBeGreaterThan(maIdx);
+    expect(popupIdx).toBeGreaterThan(paIdx);
+  });
+
+  test('contient la section « Agents » (masquee par defaut) et la vue « Résultat »', () => {
+    for (const id of ['agents-block', 'agents-select', 'agents-text', 'agents-launch', 'agents-status', 'agents-empty',
+                      'agents-result', 'agents-result-name', 'agents-result-text', 'agents-result-copy', 'agents-result-close']) {
+      expect(html).toContain(`id="${id}"`);
+    }
+    expect(html).toMatch(/id="agents-block"[^>]*display:none/);
+    expect(html).toMatch(/id="agents-result"[^>]*display:none/);
   });
 });
 

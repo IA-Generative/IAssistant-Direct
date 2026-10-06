@@ -18,7 +18,7 @@
 ### 1.1 Lancer les tests
 
 ```bash
-npm test                # 101 tests, ~1s
+npm test                # 201 tests, ~8s
 npm run test:watch      # relance a chaque modif
 npm run test:coverage   # rapport de couverture
 ```
@@ -32,7 +32,9 @@ npm run test:coverage   # rapport de couverture
 | `dm-bootstrap.test.js`    | Config fetch, cache, fallback, merge, headers DM         |
 | `dm-telemetry.test.js`    | Spans OTLP, buffer, flush, retry, token refresh          |
 | `manifest-html.test.js`   | Structure manifest, profils config, ordre des scripts    |
-| `url-refactoring.test.js` | Migration URLs hardcodees vers config DM + auth.js       |
+| `url-refactoring.test.js` | Migration URLs hardcodees vers config DM + auth.js, aucune journalisation de jeton |
+| `mesagents.test.js`       | Contrat d'agents : message, neutralisation, filtrage, erreurs, 401→refresh, delai |
+| `popup-agents.test.js`    | Section « Agents » et vue « Resultat » du popup (jsdom sur popup.html) |
 
 ### 1.3 Ajouter un test
 
@@ -335,7 +337,7 @@ jobs:
 ## Checklist rapide
 
 ```
-[ ] npm test                          → 101 tests passent
+[ ] npm test                          → 201 tests passent
 [ ] F5 dans VSCode                    → extension chargee, pas d'erreurs
 [ ] Popup s'ouvre                     → URL detectee, boutons visibles
 [ ] Flow PKCE                         → fenetre SSO, token stocke

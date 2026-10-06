@@ -199,5 +199,28 @@ describe('DMBootstrap', () => {
       const features = window.DMBootstrap.getFeatures();
       expect(features).toEqual({});
     });
+
+    test('rend les flags servis par le DM (ex. features.agents)', async () => {
+      __seedChromeStorage({ dmClientUUID: 'u' });
+      global.fetch.mockResolvedValueOnce({
+        ok: true, status: 200,
+        json: () => Promise.resolve({ config: { features: { agents: false }, mesagentsBaseUrl: 'https://mesagents.test' } })
+      });
+      await window.DMBootstrap.fetchConfig('https://dm.test');
+      expect(window.DMBootstrap.getFeatures()).toEqual({ agents: false });
+      expect(window.DMBootstrap.getConfig().mesagentsBaseUrl).toBe('https://mesagents.test');
+    });
+
+    test('ignore une valeur features non objet', async () => {
+      __seedChromeStorage({ dmConfig: { features: 'oui' } });
+      await window.DMBootstrap.getConfigAsync();
+      expect(window.DMBootstrap.getFeatures()).toEqual({});
+    });
+  });
+
+  describe('mesagentsBaseUrl (contrat d\'agents)', () => {
+    test('vide par defaut : fonction « Agents » invisible sans DM', () => {
+      expect(window.DMBootstrap.getConfig().mesagentsBaseUrl).toBe('');
+    });
   });
 });

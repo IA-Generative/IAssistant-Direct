@@ -60,7 +60,7 @@ async function getLocalToken() {
     throw new Error('Authentification MirAI requise.');
   }
 
-  console.log('[MirAI] Token récupéré :', token);
+  // Ne jamais journaliser le jeton.
   return token
 }
 
