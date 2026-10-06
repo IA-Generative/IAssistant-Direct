@@ -29,6 +29,32 @@ describe('URL refactoring — recording.js', () => {
     const code = readFile('recording.js');
     expect(code).toContain("DMTelemetry.sendSpan('meeting.create'");
   });
+
+  test('ne journalise jamais le jeton (fuite corrigee)', () => {
+    const code = readFile('recording.js');
+    expect(code).not.toMatch(/console\.\w+\([^)]*Token récupéré/);
+    expect(code).not.toMatch(/console\.\w+\([^)]*,\s*token\s*\)/);
+  });
+});
+
+describe('Contrat d\'agents MirAI — aucune journalisation du jeton', () => {
+  test.each(['mesagents.js', 'popup-agents.js', 'background.js', 'auth.js', 'recording.js'])('%s ne passe jamais une variable de jeton a console.*', (name) => {
+    const code = readFile(name);
+    // Une variable de jeton passee en argument (`, token)`) ou interpolee (`${token}`) dans un console.*
+    expect(code).not.toMatch(/console\.\w+\([^)]*,\s*(token|jeton|accessToken|access_token|tokenData|miraiToken|refresh_token)\s*\)/);
+    expect(code).not.toMatch(/console\.\w+\([^)]*\$\{\s*(token|jeton|accessToken|tokenData|miraiToken)\b/);
+  });
+
+  test('background.js branche MesAgents sur le rafraichissement silencieux existant', () => {
+    const code = readFile('background.js');
+    expect(code).toContain('MesAgents.setAuth(');
+    expect(code).toContain('_ensureTokenFresh({ force: forcer })');
+  });
+
+  test('auth.js et background.js construisent la portee via MesAgents.buildScope', () => {
+    expect(readFile('auth.js')).toContain('MesAgents.buildScope');
+    expect(readFile('background.js')).toContain('MesAgents.buildScope');
+  });
 });
 
 describe('URL refactoring — popup.js', () => {

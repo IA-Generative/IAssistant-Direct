@@ -17,7 +17,9 @@
     "identity",
     "activeTab",
     "alarms",
-    "notifications"
+    "notifications",
+    "contextMenus",
+    "scripting"
   ],
 
   "host_permissions": [
@@ -25,7 +27,14 @@
   ],
 
   "background": {
-    "service_worker": "src/background.js"
+    "service_worker": "src/background.js",
+    "scripts": [
+      "src/crypto.js",
+      "src/dm/bootstrap.js",
+      "src/recording.js",
+      "src/mesagents.js",
+      "src/background.js"
+    ]
   },
 
   "action": {
