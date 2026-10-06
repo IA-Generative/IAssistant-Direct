@@ -44,6 +44,7 @@ la premiere de ces actions.
 - **Raccourcis MirAI** — acces rapide a Chat, Resume, Compte rendu, Comu, Aide
 - **Multi-profils** — config centralisee dans `src/dm/config.json` ; cibles de build `prod-scaleway` / `prod-dgx` (flag `--target`) ; profil `prod` generique servi au runtime par chaque DM
 - **Device Management** — enrollment, relay, telemetrie OTLP, auto-update
+- **Agents MirAI** — menu contextuel « Agents MirAI » (selection ou page) et section « Agents » du popup, branches sur le contrat d'agents MirAI (Mes agents) ; invisible tant que la cle DM `mesagentsBaseUrl` est vide
 
 ## Structure
 
@@ -56,7 +57,9 @@ src/
   overlay.js                          # Bouton REC flottant (content script)
   callback.html / callback.js        # Page retour SSO
   auth.js                            # PKCE + enrollment DM
-  background.js                      # Service worker
+  background.js                      # Service worker (Chrome) / page d'arriere-plan (Firefox)
+  mesagents.js                       # Contrat d'agents MirAI (liste, lancement, erreurs)
+  popup-agents.js                    # Section « Agents » + vue « Resultat » du popup
   recording.js                       # API meetings (start/stop/sync)
   compat.js                          # Bridge Chrome/Firefox
   crypto.js                          # Chiffrement AES-GCM
@@ -66,13 +69,14 @@ src/
     bootstrap.js                     # Client config DM
     telemetry.js                     # Telemetrie OTLP
 icons/                               # Icones extension
-tests/                               # 106 tests Jest
+tests/                               # 201 tests Jest
 scripts/
   build.sh                           # Build + packaging CRX/XPI
   deploy-release.sh                  # Deploy vers le DM
   register-dm.sh                     # Enregistrement du plugin dans le DM
   recette.py                         # Jeu de recette automatique (stdlib, in-cluster ou distant)
 docs/
+  ARCHITECTURE.md                    # Contextes d'execution, config DM, contrat d'agents
   adr-dgx-deployment.md              # ADR deploiement on-premise DGX
   keycloak-offline-tokens.md         # Config Keycloak session 6 mois (offline tokens)
   demande-changement-deploiement-navigateur.md  # Demande de changement IT (force-install)
@@ -95,7 +99,7 @@ npm install
 ## Tests
 
 ```bash
-npm test              # 106 tests
+npm test              # 201 tests
 npm run test:watch    # mode watch
 npm run test:coverage # couverture
 ```
@@ -163,6 +167,44 @@ DM_ADMIN_TOKEN=xxx scripts/deploy-release.sh --target=dgx
 BOOTSTRAP_URL=https://dm-staging.example DM_ADMIN_TOKEN=xxx \
   scripts/deploy-release.sh --target=dgx
 ```
+
+## Agents MirAI
+
+L'extension consomme le **contrat d'agents MirAI** (`myagents-contrat/docs/contrats/contrat-agents-mirai.md`) :
+elle liste les agents auxquels la personne a droit et les lance sur ce qu'elle a sous les yeux.
+
+- **Menu contextuel « Agents MirAI »** : clic droit sur une selection (agents `inputs ∋ selection`)
+  ou sur une page (agents `inputs ∋ page`). L'extension lit la selection — ou le titre, l'URL et
+  le texte principal de la page (borne a 20 000 caracteres) — et lance l'agent. La reponse
+  s'affiche dans le popup (vue « Resultat » : nom de l'agent, texte, bouton « Copier »), ouvert
+  par programme quand le navigateur le permet, sinon annonce par une notification.
+- **Section « Agents » du popup** : agents `inputs ∋ text`, champ texte, bouton « Lancer ».
+- La liste est rafraichie a l'ouverture de session et toutes les 3 minutes ; la section et le
+  menu disparaissent (sans bloquer) si la fonction est desactivee, la personne deconnectee,
+  l'audience refusee ou le service injoignable. Une reponse `422` de la garde anti-injection est
+  affichee telle quelle.
+
+### Activer la fonction (gestes d'exploitation)
+
+1. **Portee Keycloak** — importer le client scope `mesagents-agents` (JSON de reference :
+   `myagents-contrat/keycloak/mesagents-agents.client-scope.json` : audience `mesagents` dans le
+   jeton d'acces + groupes en chemins complets) et l'affecter **en optionnel** au client public
+   `mirai-extension` (realm `mirai`). L'extension l'ajoute au `scope` de la demande PKCE
+   (`openid profile email offline_access mesagents-agents`) uniquement quand la fonction est
+   active. **A faire avant l'etape 2** : sans la portee, Keycloak repond `invalid_scope` et la
+   connexion echoue.
+2. **Cle DM** — renseigner `MESAGENTS_BASE_URL` (ex. `https://mesagents.<domaine>`) dans
+   l'environnement du device-management : le profil `prod` servi au runtime porte
+   `"mesagentsBaseUrl": "${{MESAGENTS_BASE_URL}}"`. Vide, placeholder non resolu ou non `https`
+   ⇒ fonction invisible. `features.agents: false` dans la config servie coupe la fonction sans
+   retirer l'URL.
+3. **Reconnexion** — les personnes deja connectees avant l'activation portent un jeton sans
+   l'audience `mesagents` : la section reste masquee (`audience_mismatch`) jusqu'a « Reconnecter ».
+4. **CORS / `azp`** — cote Mes agents, l'origine de l'extension n'est pas une origine web
+   (`chrome-extension://…`, `moz-extension://…`) : les appels partent du service worker ou du
+   popup, sans preflight navigateur classique ; si `azp` est filtre, ajouter `mirai-extension`.
+
+Detail du flux et des erreurs : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Plateformes supportees
 
