@@ -71,6 +71,18 @@ window.MiraiAuth = {
     return `${cfg.issuerUrl}/protocol/openid-connect/userinfo`;
   },
 
+  /**
+   * Portée OIDC demandée. Ajoute `mesagents-agents` (audience « mesagents » du contrat
+   * d'agents MirAI) uniquement si la fonction Agents est active (clé DM `mesagentsBaseUrl`
+   * renseignée) — sinon Keycloak répondrait `invalid_scope`.
+   */
+  _buildScope() {
+    const base = 'openid profile email offline_access';
+    const dm = window.DMBootstrap?.getConfig() || {};
+    if (window.MesAgents?.buildScope) return window.MesAgents.buildScope(base, dm);
+    return base;
+  },
+
   // ──────────────────────────────────────────────
   // Token storage
   // ──────────────────────────────────────────────
@@ -302,10 +314,12 @@ window.MiraiAuth = {
       const B = (typeof browser !== 'undefined') ? browser : chrome;
       const callbackUrl = B.runtime.getURL('src/callback.html');
 
+      const scope = this._buildScope();
+
       const silentParams = {
         client_id: cfg.clientId,
         response_type: 'code',
-        scope: 'openid profile email offline_access',
+        scope: scope,
         redirect_uri: cfg.redirectUri,
         code_challenge: codeChallenge,
         code_challenge_method: 'S256'
@@ -314,7 +328,7 @@ window.MiraiAuth = {
       const tabParams = {
         client_id: cfg.clientId,
         response_type: 'code',
-        scope: 'openid profile email offline_access',
+        scope: scope,
         redirect_uri: callbackUrl,
         code_challenge: codeChallenge,
         code_challenge_method: 'S256'

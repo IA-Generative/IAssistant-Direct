@@ -50,6 +50,10 @@ beforeEach(() => {
   const fs = require('fs');
   const path = require('path');
   eval(fs.readFileSync(path.join(__dirname, '..', 'src', 'crypto.js'), 'utf8'));
+  // mesagents.js (contrat d'agents) : fournit buildScope — charge apres auth.js dans popup.html,
+  // mais auth.js ne le lit qu'a l'appel de login().
+  delete globalThis.MesAgents;
+  eval(fs.readFileSync(path.join(__dirname, '..', 'src', 'mesagents.js'), 'utf8'));
   const code = fs.readFileSync(path.join(__dirname, '..', 'src', 'auth.js'), 'utf8');
   eval(code);
 });
@@ -355,6 +359,51 @@ describe('MiraiAuth', () => {
 
     test('retourne false si pas enrolled', async () => {
       expect(await window.MiraiAuth.isDMEnrolled()).toBe(false);
+    });
+  });
+
+  describe('Portee OIDC — contrat d\'agents MirAI', () => {
+    test('sans mesagentsBaseUrl : portee de base, sans mesagents-agents (evite invalid_scope)', () => {
+      expect(window.MiraiAuth._buildScope()).toBe('openid profile email offline_access');
+    });
+
+    test('avec mesagentsBaseUrl : ajoute mesagents-agents', () => {
+      window.DMBootstrap = { getConfig: () => ({ mesagentsBaseUrl: 'https://mesagents.test', features: { agents: true } }) };
+      expect(window.MiraiAuth._buildScope()).toBe('openid profile email offline_access mesagents-agents');
+    });
+
+    test('features.agents=false : pas de portee supplementaire meme avec l\'URL', () => {
+      window.DMBootstrap = { getConfig: () => ({ mesagentsBaseUrl: 'https://mesagents.test', features: { agents: false } }) };
+      expect(window.MiraiAuth._buildScope()).toBe('openid profile email offline_access');
+    });
+
+    test('login() demande la portee mesagents-agents dans l\'URL interactive quand la fonction est active', async () => {
+      window.DMBootstrap = {
+        getConfig: () => ({
+          keycloakIssuerUrl: 'https://sso.test.example.com/realms/test-realm',
+          keycloakClientId: 'mirai-extension',
+          mesagentsBaseUrl: 'https://mesagents.test'
+        })
+      };
+      window.CompatAPI.launchWebAuthFlow.mockRejectedValueOnce(new Error('silent failed'));
+      jest.spyOn(window.MiraiAuth, '_openTabAndWaitForCode').mockResolvedValueOnce(null);
+
+      await window.MiraiAuth.login();
+
+      const silentUrl = window.CompatAPI.launchWebAuthFlow.mock.calls[0][0].url;
+      const interactiveUrl = window.MiraiAuth._openTabAndWaitForCode.mock.calls[0][0];
+      for (const u of [silentUrl, interactiveUrl]) {
+        const scope = new URL(u).searchParams.get('scope');
+        expect(scope).toBe('openid profile email offline_access mesagents-agents');
+      }
+    });
+
+    test('login() sans cle DM : portee inchangee', async () => {
+      window.CompatAPI.launchWebAuthFlow.mockRejectedValueOnce(new Error('silent failed'));
+      jest.spyOn(window.MiraiAuth, '_openTabAndWaitForCode').mockResolvedValueOnce(null);
+      await window.MiraiAuth.login();
+      const interactiveUrl = window.MiraiAuth._openTabAndWaitForCode.mock.calls[0][0];
+      expect(new URL(interactiveUrl).searchParams.get('scope')).toBe('openid profile email offline_access');
     });
   });
 });
