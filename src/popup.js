@@ -1124,6 +1124,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       window.DMTelemetry.init(window.DMBootstrap.getConfig());
     }
 
+    // Agents MirAI (contrat d'agents) : section visible seulement si la clé DM
+    // `mesagentsBaseUrl` est renseignée, la personne connectée et le service joignable.
+    if (window.PopupAgents) {
+      window.PopupAgents.init(document);
+      window.PopupAgents.charger().catch(e => console.warn('[MirAI Agents] Chargement :', e?.message));
+    }
+
     // Sync local recordings with API (detect stale CAPTURE_IN_PROGRESS)
     if (typeof syncRecordingsWithAPI === 'function') {
       syncRecordingsWithAPI().catch(e => console.warn('[MirAI] Sync recordings failed:', e.message));

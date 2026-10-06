@@ -50,3 +50,17 @@ input{padding:6px;border:1px solid #ccc;border-radius:6px;flex:1}
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
+
+/* Agents MirAI (contrat d'agents) */
+.agents-label{display:block;font-size:11px;color:#333;margin-top:6px}
+.agents-select{width:100%;font-size:12px;padding:4px;margin-top:2px}
+.agents-desc{font-size:11px;color:#666;margin-top:4px;max-height:48px;overflow:auto;white-space:pre-wrap}
+.agents-text{width:100%;box-sizing:border-box;font-size:12px;padding:6px;border:1px solid #ccc;border-radius:6px;margin-top:2px;resize:vertical;font-family:inherit}
+.agents-actions{display:flex;align-items:center;gap:8px;margin-top:6px}
+.agents-status{font-size:11px;color:#666}
+.agents-status.busy{color:#d29922}
+.agents-status.err{color:#c33}
+.agents-empty{font-size:11px;color:#888;font-style:italic}
+.agents-link{cursor:pointer;text-decoration:underline;font-size:11px;color:#0072cf}
+.agents-result{margin-bottom:12px;padding:8px;border:1px solid #cfe3f5;background:#f3f9ff;border-radius:6px}
+.agents-result-text{white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:12px;max-height:220px;overflow:auto;margin:6px 0;background:#fff;padding:6px;border-radius:4px;border:1px solid #e3eef8}

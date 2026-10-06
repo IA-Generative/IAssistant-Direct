@@ -34,6 +34,19 @@
   </div>
   <div class="container" style="position: relative;">
 
+    <div id="agents-result" class="agents-result" style="display:none;">
+      <div class="list-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Résultat — <span id="agents-result-name"></span></span>
+        <span id="agents-result-close" class="agents-link" title="Fermer">Fermer</span>
+      </div>
+      <div id="agents-result-status" class="agents-status"></div>
+      <pre id="agents-result-text" class="agents-result-text"></pre>
+      <div class="agents-actions">
+        <button id="agents-result-copy" class="small" type="button">Copier</button>
+        <span id="agents-result-copied" class="agents-status"></span>
+      </div>
+    </div>
+
     <div class="url-row">
       <div id="fav" title="Bookmark this URL" class="fav">☆</div>
       <div id="current-url" class="url">--</div>
@@ -91,6 +104,24 @@
       </div>
       <ul id="history-list" class="history" style="max-height:140px;overflow-y:auto;"></ul>
     </div>
+    <div id="agents-block" class="list-block" style="display:none;margin-top:20px;padding-top:10px;border-top:1px solid #ddd;">
+      <div class="list-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Agents MirAI</span>
+        <span id="agents-refresh" class="agents-link" title="Recharger la liste des agents">Rafraîchir</span>
+      </div>
+      <div id="agents-form">
+        <label for="agents-select" class="agents-label">Agent :</label>
+        <select id="agents-select" class="agents-select"></select>
+        <div id="agents-description" class="agents-desc"></div>
+        <label for="agents-text" class="agents-label">Texte à confier à l'agent :</label>
+        <textarea id="agents-text" class="agents-text" rows="3" maxlength="100000" placeholder="Collez ou saisissez un texte (Ctrl+Entrée pour lancer)"></textarea>
+        <div class="agents-actions">
+          <button id="agents-launch" class="small" type="button">Lancer</button>
+          <span id="agents-status" class="agents-status"></span>
+        </div>
+      </div>
+      <div id="agents-empty" class="agents-empty" style="display:none;">Aucun agent ne travaille sur un texte saisi.</div>
+    </div>
   </div>
   
   <div class="shortcuts" style="display:flex;justify-content:space-around;align-items:center;font-size:11px;color:#0072cf;margin-top:10px;padding:4px 6px;border-top:1px solid #ddd;">
@@ -114,6 +145,8 @@
   <script src="crypto.js"></script>
   <script src="auth.js"></script>
   <script src="recording.js"></script>
+  <script src="mesagents.js"></script>
+  <script src="popup-agents.js"></script>
   <script src="popup.js"></script>
 
 </body>
