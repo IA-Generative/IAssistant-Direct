@@ -468,7 +468,9 @@
     if (p.titre) c.append(el('strong', {}, p.titre));
     if (p.texte) c.append(el('p', {}, p.texte));
     const pied = el('div', { className: 'pied' });
-    pied.append(el('span', {}, p.source || ''));
+    // Les passages d'un assistant portent l'id de la collection : titre de la cible si connue.
+    const cible = cibles.find((c) => c.id === p.source);
+    pied.append(el('span', {}, cible ? cible.titre : (p.source || '')));
     if (estHttps(p.url)) pied.append(lien(p.url, 'Ouvrir ↗'));
     c.append(pied);
     return c;

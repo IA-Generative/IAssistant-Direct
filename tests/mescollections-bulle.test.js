@@ -87,6 +87,8 @@ test('passages en cartes avec lien « Ouvrir » https', async () => {
   const liens = [...racine.querySelectorAll('.carte a')];
   expect(liens.map((a) => a.href)).toEqual(['https://x.fake-domain.name/1', 'https://x.fake-domain.name/2']);
   expect(liens.every((a) => a.rel.includes('noopener'))).toBe(true);
+  // source = id de collection, affichée sous le titre de la cible de la page
+  expect(racine.querySelector('.carte .pied span').textContent).toBe('CESEDA');
 });
 
 test('mode anonyme : pas de saisie, bouton de connexion', async () => {
