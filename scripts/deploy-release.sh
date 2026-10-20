@@ -5,14 +5,14 @@
 #     scripts/deploy-release.sh --target=dgx
 #
 # Targets:
-#   --target=scaleway (default) → profile prod-scaleway
-#   --target=dgx                → profile prod-dgx
+#   --target=prod (default) → profile prod (UN package, liste bootstrap_urls scannee)
+# Le DM cible de l'upload = $BOOTSTRAP_URL (override l'endpoint par defaut ci-dessous).
 #
 # Produces:
-#   - mirai-browser-${VERSION}-${TARGET}.crx   (Chrome, signed with PEM key)
-#   - mirai-browser-${VERSION}-${TARGET}.xpi   (Firefox ESR)
-#   - updates/mirai-browser-${TARGET}.xml  (Chrome auto-update manifest)
-#   - updates/mirai-browser-${TARGET}.json (Firefox auto-update manifest)
+#   - ${SLUG}-${VERSION}-${TARGET}.crx   (Chrome, signed with PEM key)
+#   - ${SLUG}-${VERSION}-${TARGET}.xpi   (Firefox ESR)
+#   - updates/${SLUG}/${TARGET}.xml  (Chrome auto-update manifest)
+#   - updates/${SLUG}/${TARGET}.json (Firefox auto-update manifest)
 #   - Uploads everything to the DM bootstrap server at $BOOTSTRAP_URL
 
 set -euo pipefail
@@ -20,29 +20,46 @@ set -euo pipefail
 # ──────────────────────────────────────────────
 # Parse --target
 # ──────────────────────────────────────────────
-TARGET="scaleway"
+TARGET="prod"
 for arg in "$@"; do
   case "$arg" in
     --target=*) TARGET="${arg#--target=}" ;;
   esac
 done
 
+# TARGET_BOOTSTRAP = endpoint d'upload par defaut (le DM cible). Surchargeable par
+# BOOTSTRAP_URL pour publier le MEME package vers chaque DM (scaleway/dgx/onprem).
 case "$TARGET" in
-  scaleway) PROFILE="prod-scaleway" ; TARGET_BOOTSTRAP="https://bootstrap.fake-domain.name" ;;
-  dgx)      PROFILE="prod-dgx"      ; TARGET_BOOTSTRAP="https://onyxia.gpu.minint.fr/bootstrap" ;;
-  *) echo "ERROR: unknown target '$TARGET' (expected: scaleway|dgx)" >&2 ; exit 1 ;;
+  prod) PROFILE="prod" ; TARGET_BOOTSTRAP="https://bootstrap.apps.ocpbm02s2.cores.r2.pi2.minint.fr" ;;
+  *) echo "ERROR: unknown target '$TARGET' (expected: prod)" >&2 ; exit 1 ;;
 esac
 
 # ──────────────────────────────────────────────
 # Configuration
 # ──────────────────────────────────────────────
-SLUG="mirai-browser"
+SLUG="iassistant-direct-browser"
 GECKO_ID="mirai-assistant@interieur.gouv.fr"
-# BOOTSTRAP_URL = where we UPLOAD artefacts (DM server endpoint).
-# Defaults to the target's own bootstrap URL but can be overridden, e.g. to a staging DM.
+
+# --- Pipeline catalogue DM (le DM genere les manifests d'update) ---
+# Le client = autorite version/changelog/binaire ; le DM = autorite manifests/URLs.
+# Valeurs confirmees par l'agent DM (image 0.6.x). Override possible par env.
+TOKEN_HEADER="${TOKEN_HEADER:-x-admin-token}"        # comparé constant-time, insensible casse
+DISTRIBUTION_MODE="${DISTRIBUTION_MODE:-managed}"    # managed|download_link|store|manual
+# platform_variant = "<engine>-<target>" (chromium-${TARGET} / gecko-${TARGET}).
+# C'est la cle que le DM cherche pour generer chaque manifest d'update :
+#   /updates/{slug}/{target}.xml  -> chromium-${TARGET}
+#   /updates/{slug}/{target}.json -> gecko-${TARGET}
+# Un variant DISTINCT par moteur => les .crx et .xpi coexistent sous 1 plugin_version
+# (sinon ON CONFLICT sur (version,variant) ecrase l'un par l'autre). Voir main.py:_UPDATE_ENGINE_BY_EXT.
+ENVIRONMENT="${ENVIRONMENT:-prod}"                   # dev|int|prod (defaut DM = dev)
+# plugin_id = id ENTIER du catalogue (PAS le slug) ; resolu via GET /catalog/api/plugins.
+# Surchargeable par env (CI / tests hors-ligne).
+PLUGIN_ID="${PLUGIN_ID:-}"
+# BOOTSTRAP_URL = DM cible de l'upload (= le DM de la region TARGET). Override staging possible.
 BOOTSTRAP_URL="${BOOTSTRAP_URL:-$TARGET_BOOTSTRAP}"
-ADMIN_TOKEN="${DM_ADMIN_TOKEN:-}"
-[ -n "$ADMIN_TOKEN" ] || { echo "ERROR: DM_ADMIN_TOKEN not set"; exit 1; }
+# Token de service CI : x-admin-token = <DM_QUEUE_ADMIN_TOKEN> (fallback DM_ADMIN_TOKEN).
+ADMIN_TOKEN="${DM_QUEUE_ADMIN_TOKEN:-${DM_ADMIN_TOKEN:-}}"
+[ -n "$ADMIN_TOKEN" ] || { echo "ERROR: DM_QUEUE_ADMIN_TOKEN not set"; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 EXT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -55,6 +72,12 @@ OUT_DIR="/tmp/${SLUG}-release"
 
 # Read version from manifest.json
 VERSION=$(python3 -c "import json; print(json.load(open('$EXT_DIR/manifest.json'))['version'])")
+# Release notes = changelog de la version courante (src/dm/manifest.json), pour le DM
+RELEASE_NOTES=$(python3 -c "
+import json
+cl = json.load(open('$EXT_DIR/src/dm/manifest.json')).get('changelog', [{}])[0]
+print('; '.join(cl.get('changes', [])))
+")
 echo "Building $SLUG v$VERSION (target=$TARGET, profile=$PROFILE)..."
 echo "  Target bootstrap (baked into artefact) : $TARGET_BOOTSTRAP"
 echo "  Upload endpoint  (DM server)           : $BOOTSTRAP_URL"
@@ -72,7 +95,7 @@ echo "Extension ID: $EXTENSION_ID"
 # 1. Prepare clean build directory
 # ──────────────────────────────────────────────
 rm -rf "$BUILD_DIR" "$OUT_DIR"
-mkdir -p "$BUILD_DIR" "$OUT_DIR/updates"
+mkdir -p "$BUILD_DIR" "$OUT_DIR"
 
 # Copy only what the extension needs
 cp "$EXT_DIR/manifest.json" "$BUILD_DIR/"
@@ -87,12 +110,14 @@ cp -r "$EXT_DIR/icons/" "$BUILD_DIR/icons/"
 mkdir -p "$BUILD_DIR/assets"
 cp "$EXT_DIR/icons/icon128.png" "$BUILD_DIR/assets/icon128.png"
 
-# Inject update_url into manifest.json for auto-update (suffixed by target)
+# Inject update_url into manifest.json for auto-update.
+# Vise le DM de PRODUCTION de la cible (TARGET_BOOTSTRAP), pas l'endpoint d'upload
+# (BOOTSTRAP_URL, override-able vers un DM de staging). Routes GÉNÉRÉES par le DM.
 python3 -c "
 import json
 m = json.load(open('$BUILD_DIR/manifest.json'))
-m['update_url'] = '${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.xml'
-m['browser_specific_settings']['gecko']['update_url'] = '${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.json'
+m['update_url'] = '${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.xml'
+m['browser_specific_settings']['gecko']['update_url'] = '${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.json'
 json.dump(m, open('$BUILD_DIR/manifest.json', 'w'), indent=2, ensure_ascii=False)
 "
 
@@ -180,86 +205,55 @@ echo "Packaging XPI..."
 echo "  OK  ${SLUG}-${VERSION}-${TARGET}.xpi"
 
 # ──────────────────────────────────────────────
-# 4. Generate Chrome update manifest (XML)
-# ──────────────────────────────────────────────
-cat > "$OUT_DIR/updates/mirai-browser-${TARGET}.xml" <<XMLEOF
-<?xml version='1.0' encoding='UTF-8'?>
-<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
-  <app appid='${EXTENSION_ID}'>
-    <updatecheck codebase='${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.crx'
-                 version='${VERSION}' />
-  </app>
-</gupdate>
-XMLEOF
-echo "  OK  updates/mirai-browser-${TARGET}.xml (appid=${EXTENSION_ID})"
-
-# ──────────────────────────────────────────────
-# 5. Generate Firefox update manifest (JSON)
-# ──────────────────────────────────────────────
-cat > "$OUT_DIR/updates/mirai-browser-${TARGET}.json" <<JSONEOF
-{
-  "addons": {
-    "${GECKO_ID}": {
-      "updates": [
-        {
-          "version": "${VERSION}",
-          "update_link": "${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.xpi"
-        }
-      ]
-    }
-  }
-}
-JSONEOF
-echo "  OK  updates/mirai-browser-${TARGET}.json (gecko=${GECKO_ID})"
-
-# ──────────────────────────────────────────────
-# 6. Deploy to DM bootstrap server
+# 4. Publier les artefacts au pipeline catalogue DM
+#    Le DM enregistre 1 plugin_version + N artefacts et GÉNÈRE lui-même les manifests
+#    d'update (gupdate XML / Mozilla JSON). Endpoint : POST /admin/catalog/{plugin_id}/versions/upload
+#    (plugin_id = id ENTIER, resolu depuis le catalogue ; le format vient de l'extension .crx/.xpi).
+#    La cible scaleway/dgx = QUEL DM (BOOTSTRAP_URL), pas un champ d'upload.
 # ──────────────────────────────────────────────
 echo ""
-echo "Deploying to $BOOTSTRAP_URL..."
+echo "Publishing to $BOOTSTRAP_URL (catalog pipeline)..."
 
-# Upload CRX
-if [ -f "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.crx" ]; then
-  echo -n "  Uploading CRX... "
-  curl -sf -X PUT "${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.crx" \
-    -H "X-Admin-Token: ${ADMIN_TOKEN}" \
-    -T "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.crx" \
-    && echo "OK" || echo "FAILED"
+# Resoudre le plugin_id (entier) depuis le catalogue du DM cible, si non fourni par env.
+if [ -z "$PLUGIN_ID" ]; then
+  echo -n "  Resolving plugin_id for slug '$SLUG'... "
+  PLUGIN_ID=$(curl -sf "${BOOTSTRAP_URL}/catalog/api/plugins" 2>/dev/null \
+    | python3 -c "import sys,json; ps=json.load(sys.stdin).get('plugins',[]); print(next((p['id'] for p in ps if p.get('slug')=='$SLUG'), ''))" 2>/dev/null)
+  if [ -z "$PLUGIN_ID" ]; then
+    echo "ECHEC"
+    echo "ERROR: plugin_id introuvable pour slug '$SLUG' via ${BOOTSTRAP_URL}/catalog/api/plugins"
+    echo "       (plugin non enregistre ? sinon passer PLUGIN_ID=<id> en env)"
+    exit 1
+  fi
+  echo "id=$PLUGIN_ID"
 fi
 
-# Upload XPI
-echo -n "  Uploading XPI... "
-curl -sf -X PUT "${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.xpi" \
-  -H "X-Admin-Token: ${ADMIN_TOKEN}" \
-  -T "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.xpi" \
-  && echo "OK" || echo "FAILED"
+# .crx -> Chromium (Chrome/Edge/Brave/Opera) ; .xpi -> Gecko (Firefox/Thunderbird).
+# Même version + même release_notes : 1 plugin_version, N artefacts.
+# platform_variant distinct par moteur (chromium-${TARGET} / gecko-${TARGET}) => coexistence.
+upload_variant() {
+  local file="$1" label="$2" variant="$3"
+  if [ ! -f "$file" ]; then
+    echo "  SKIP ${label} ($(basename "$file") absent)"
+    return 0
+  fi
+  echo -n "  Upload ${label} ($(basename "$file"), variant=${variant})... "
+  if curl -sf -X POST "${BOOTSTRAP_URL}/admin/catalog/${PLUGIN_ID}/versions/upload" \
+       -H "${TOKEN_HEADER}: ${ADMIN_TOKEN}" \
+       -F "version=${VERSION}" \
+       -F "platform_variant=${variant}" \
+       -F "distribution_mode=${DISTRIBUTION_MODE}" \
+       -F "environment=${ENVIRONMENT}" \
+       -F "release_notes=${RELEASE_NOTES}" \
+       -F "binary=@${file}" >/dev/null; then
+    echo "OK"
+  else
+    echo "FAILED"
+  fi
+}
 
-# Upload Chrome update manifest
-echo -n "  Uploading Chrome update manifest... "
-curl -sf -X PUT "${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.xml" \
-  -H "X-Admin-Token: ${ADMIN_TOKEN}" \
-  -H "Content-Type: application/xml" \
-  -T "$OUT_DIR/updates/mirai-browser-${TARGET}.xml" \
-  && echo "OK" || echo "FAILED"
-
-# Upload Firefox update manifest
-echo -n "  Uploading Firefox update manifest... "
-curl -sf -X PUT "${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.json" \
-  -H "X-Admin-Token: ${ADMIN_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -T "$OUT_DIR/updates/mirai-browser-${TARGET}.json" \
-  && echo "OK" || echo "FAILED"
-
-# Deploy config (canary strategy)
-echo -n "  Deploying config bundle... "
-ZIP_PATH="/tmp/${SLUG}-config.zip"
-(cd "$BUILD_DIR" && zip -r -q "$ZIP_PATH" .)
-curl -sf -X POST "${BOOTSTRAP_URL}/api/plugins/${SLUG}/deploy" \
-  -H "X-Admin-Token: ${ADMIN_TOKEN}" \
-  -F "binary=@${ZIP_PATH}" \
-  -F "strategy=canary" | python3 -m json.tool 2>/dev/null \
-  && echo "" || echo "FAILED"
-rm -f "$ZIP_PATH"
+upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.crx" "chromium .crx" "chromium-${TARGET}"
+upload_variant "$OUT_DIR/${SLUG}-${VERSION}-${TARGET}.xpi" "gecko .xpi"     "gecko-${TARGET}"
 
 # ──────────────────────────────────────────────
 # 7. Summary
@@ -274,13 +268,12 @@ echo ""
 echo " Artifacts:"
 ls -lh "$OUT_DIR/"*.crx "$OUT_DIR/"*.xpi 2>/dev/null | awk '{print "   " $NF " (" $5 ")"}'
 echo ""
-echo " Update endpoints:"
-echo "   Chrome : ${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.xml"
-echo "   Firefox: ${BOOTSTRAP_URL}/updates/mirai-browser-${TARGET}.json"
+echo " Update endpoints (manifests GENERES par le DM) :"
+echo "   Chrome/Edge        : ${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.xml"
+echo "   Firefox/Thunderbird: ${TARGET_BOOTSTRAP}/updates/${SLUG}/${TARGET}.json"
 echo ""
-echo " Download URLs:"
-echo "   CRX: ${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.crx"
-echo "   XPI: ${BOOTSTRAP_URL}/releases/${SLUG}-${VERSION}-${TARGET}.xpi"
+echo " Artefacts publies (plugin_id=${PLUGIN_ID}, env=${ENVIRONMENT}) :"
+echo "   .crx variant=chromium-${TARGET} + .xpi variant=gecko-${TARGET} ; download interne au DM"
 echo ""
 echo " Auto-update: navigateurs verifient periodiquement"
 echo "   Chrome  ~5h  | Firefox ~24h"

@@ -1,0 +1,52 @@
+{
+  "configVersion": 1,
+  "slug": "iassistant-direct-browser",
+  "_description": "Template DM (uploade comme config_template). Les profils dev/int/prod contiennent des placeholders ${{...}} resolus cote serveur DM a partir des variables d'environnement, au GET /config. Exception : keycloakClientId est en dur (mirai-extension) car ${{KEYCLOAK_CLIENT_ID}} est le client du DM lui-meme (bootstrap-iassistant), pas celui de l'extension. Voir docs/adr-plugin-dm-integration.md. NE PAS mettre de valeur en dur env-specifique ici : la config bakee client (src/dm/config.json) en a la charge.",
+  "default": {
+    "portal_url": "https://mirai.interieur.gouv.fr",
+    "doc_url": "https://github.com/IA-Generative/AssistantMiraiLibreOffice/blob/master/docs/notice-utilisateur.md",
+    "enabled": true,
+    "telemetryEnabled": true,
+    "telemetrylogJson": true,
+    "telemetryAuthorizationType": "Bearer",
+    "authHeaderName": "Authorization",
+    "authHeaderPrefix": "Bearer ",
+    "allowedKeywords": ["webconf", "visio", "comu", "webinaire", "webex", "gmeet", "teams"]
+  },
+  "dev": {
+    "_description": "Dev avec DM Docker Compose local",
+    "keycloakIssuerUrl": "${{KEYCLOAK_ISSUER_URL}}",
+    "keycloakRealm": "${{KEYCLOAK_REALM}}",
+    "keycloakClientId": "mirai-extension",
+    "apiBase": "${{API_BASE}}",
+    "relayAssistantBaseUrl": "${{RELAY_ASSISTANT_BASE_URL}}",
+    "compteRenduUrl": "${{COMPTE_RENDU_URL}}",
+    "comuUrl": "${{COMU_URL}}",
+    "telemetryEndpoint": "${{TELEMETRY_ENDPOINT}}",
+    "telemetryKey": "${{TELEMETRY_KEY}}"
+  },
+  "int": {
+    "_description": "Integration / recette",
+    "keycloakIssuerUrl": "${{KEYCLOAK_ISSUER_URL}}",
+    "keycloakRealm": "${{KEYCLOAK_REALM}}",
+    "keycloakClientId": "mirai-extension",
+    "apiBase": "${{API_BASE}}",
+    "relayAssistantBaseUrl": "${{RELAY_ASSISTANT_BASE_URL}}",
+    "compteRenduUrl": "${{COMPTE_RENDU_URL}}",
+    "comuUrl": "${{COMU_URL}}",
+    "telemetryEndpoint": "${{TELEMETRY_ENDPOINT}}",
+    "telemetryKey": "${{TELEMETRY_KEY}}"
+  },
+  "prod": {
+    "_description": "Production generique — chaque DM (DGX/Scaleway) resout ses propres valeurs via ses variables d'env. C'est le profil servi au runtime (?profile=prod).",
+    "keycloakIssuerUrl": "${{KEYCLOAK_ISSUER_URL}}",
+    "keycloakRealm": "${{KEYCLOAK_REALM}}",
+    "keycloakClientId": "mirai-extension",
+    "apiBase": "${{API_BASE}}",
+    "relayAssistantBaseUrl": "${{RELAY_ASSISTANT_BASE_URL}}",
+    "compteRenduUrl": "${{COMPTE_RENDU_URL}}",
+    "comuUrl": "${{COMU_URL}}",
+    "telemetryEndpoint": "${{TELEMETRY_ENDPOINT}}",
+    "telemetryKey": "${{TELEMETRY_KEY}}"
+  }
+}

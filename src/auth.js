@@ -39,7 +39,7 @@ window.MiraiAuth = {
     );
     return {
       issuerUrl: issuerUrl,
-      clientId: cfg.keycloakClientId || 'bootstrap-iassistant',
+      clientId: cfg.keycloakClientId || 'mirai-extension',
       redirectUri: window.CompatAPI.getRedirectURL(),
       bootstrap_url: cfg.bootstrap_url || null
     };
@@ -218,7 +218,7 @@ window.MiraiAuth = {
           'X-Platform-Type': (typeof browser !== 'undefined') ? 'firefox' : 'chrome'
         },
         body: JSON.stringify({
-          device_name: 'mirai-browser',
+          device_name: 'iassistant-direct-browser',
           plugin_uuid: dmClientUUID,
           email: '',
           plugin_version: manifest.version

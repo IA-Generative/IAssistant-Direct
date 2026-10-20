@@ -46,9 +46,19 @@ api.alarms.onAlarm.addListener(async (alarm) => {
     const { dmClientUUID, dmConfig: cachedConfig } = await api.storage.local.get(['dmClientUUID', 'dmConfig']);
     const manifest = api.runtime.getManifest();
 
-    // Read DM params from cached config (set by bootstrap.js at popup init)
-    const bootstrapUrl = cachedConfig?.bootstrap_url || 'https://bootstrap.fake-domain.name';
-    const configPath = cachedConfig?.config_path || '/config/mirai-browser/config.json?profile=int';
+    // Resout le DM a interroger : URL collante (dernier resolu) si elle repond,
+    // sinon scan ordonne (preference > pousse DM > liste bakee). Retombe sur la
+    // config cachee si DMBootstrap indisponible.
+    let bootstrapUrl = null;
+    try {
+      if (typeof DMBootstrap !== 'undefined') {
+        bootstrapUrl = await DMBootstrap.resolveBootstrap();
+      }
+    } catch (e) {
+      console.warn('[MirAI DM] resolveBootstrap failed:', e.message);
+    }
+    bootstrapUrl = bootstrapUrl || cachedConfig?.bootstrap_url || 'https://bootstrap.fake-domain.name';
+    const configPath = cachedConfig?.config_path || '/config/iassistant-direct-browser/config.json?profile=prod';
 
     const resp = await fetch(`${bootstrapUrl}${configPath}`, {
       headers: {
@@ -100,9 +110,12 @@ async function _ensureTokenFresh() {
 
   if (miraiToken.expires_in < Date.now() && miraiToken.refresh_token) {
     console.info('[MirAI] Token expired, refreshing...');
-    // Config via DMBootstrap (cache/local/fallback — tous avec realm).
+    // Config via DMBootstrap en ASYNC : dans le service worker, _configCache peut
+    // etre vide (SW relance) et _readLocalConfig (XHR sync) n'existe pas en SW —
+    // getConfigAsync() relit le dmConfig PERSISTE (valeurs servies par le DM, ex.
+    // l'issuer resolu), au lieu de retomber sur le fallback hardcode sso.mirai.
     let dmConfig = {};
-    try { dmConfig = DMBootstrap.getConfig(); } catch (_) {}
+    try { dmConfig = await DMBootstrap.getConfigAsync(); } catch (_) {}
     const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr/realms/mirai').replace(/\/+$/, '');
     const realm = dmConfig?.keycloakRealm;
     const clientId = dmConfig?.keycloakClientId || 'mirai-extension';
@@ -359,7 +372,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // fetch DM si possible, sinon config locale bakée, sinon fallback (tous avec realm).
         let dmConfig = {};
         try { dmConfig = await DMBootstrap.init(); }
-        catch (_) { try { dmConfig = DMBootstrap.getConfig(); } catch (_2) {} }
+        catch (_) { try { dmConfig = await DMBootstrap.getConfigAsync(); } catch (_2) {} }
         const issuerUrl = (dmConfig?.keycloakIssuerUrl || 'https://sso.mirai.interieur.gouv.fr/realms/mirai').replace(/\/+$/, '');
         const realm = dmConfig?.keycloakRealm;
         const clientId = dmConfig?.keycloakClientId || 'mirai-extension';

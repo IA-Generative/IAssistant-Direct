@@ -43,7 +43,7 @@ describe('DMTelemetry', () => {
       expect(window.DMTelemetry._buffer).toHaveLength(1);
       expect(window.DMTelemetry._buffer[0].name).toBe('login.success');
       expect(window.DMTelemetry._buffer[0].attributes.method).toBe('pkce');
-      expect(window.DMTelemetry._buffer[0].attributes['plugin.slug']).toBe('mirai-browser');
+      expect(window.DMTelemetry._buffer[0].attributes['plugin.slug']).toBe('iassistant-direct-browser');
     });
 
     test('n\'ajoute rien si telemetrie desactivee', () => {
@@ -218,11 +218,11 @@ describe('DMTelemetry', () => {
         json: () => Promise.resolve({ token: 'new-token-xyz' })
       });
 
-      await window.DMTelemetry.refreshToken('https://dm.test', 'mirai-browser', 'int');
+      await window.DMTelemetry.refreshToken('https://dm.test', 'iassistant-direct-browser', 'int');
 
       expect(window.DMTelemetry._token).toBe('new-token-xyz');
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://dm.test/telemetry/token?device=mirai-browser&profile=int'
+        'https://dm.test/telemetry/token?device=iassistant-direct-browser&profile=int'
       );
     });
 

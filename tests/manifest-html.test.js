@@ -43,16 +43,23 @@ describe('dm/config.json', () => {
     expect(config.configVersion).toBe(1);
   });
 
-  test('contient les profils dev, int, prod-scaleway, prod-dgx', () => {
+  test('contient les profils dev, int, prod (UN seul prod multi-DM)', () => {
     expect(config.dev).toBeDefined();
     expect(config.int).toBeDefined();
-    expect(config['prod-scaleway']).toBeDefined();
-    expect(config['prod-dgx']).toBeDefined();
+    expect(config.prod).toBeDefined();
+    // Les anciens profils par environnement sont supprimes (collapse en prod unique).
+    expect(config['prod-scaleway']).toBeUndefined();
+    expect(config['prod-dgx']).toBeUndefined();
+    expect(config['prod-onprem']).toBeUndefined();
   });
 
   test('contient slug et activeProfile', () => {
-    expect(config.slug).toBe('mirai-browser');
+    expect(config.slug).toBe('iassistant-direct-browser');
     expect(config.activeProfile).toBeDefined();
+  });
+
+  test('config bakee : aucun placeholder ${{}} (les placeholders vivent dans dm-config.json)', () => {
+    expect(JSON.stringify(config)).not.toContain('${{');
   });
 
   test('profil int contient toutes les URLs attendues', () => {
@@ -60,44 +67,40 @@ describe('dm/config.json', () => {
     expect(config.int.keycloakRealm).toBeDefined();
     expect(config.int.keycloakClientId).toBeDefined();
     expect(config.int.apiBase).toBe('https://compte-rendu.mirai.interieur.gouv.fr/api');
-    expect(config.int.chatUrl).toBeDefined();
-    expect(config.int.resumeUrl).toBeDefined();
     expect(config.int.compteRenduUrl).toBeDefined();
     expect(config.int.comuUrl).toBeDefined();
   });
 
-  test('profil prod-scaleway pointe Keycloak sur sso.mirai.interieur.gouv.fr', () => {
-    expect(config['prod-scaleway'].keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
-    expect(config['prod-scaleway'].keycloakRealm).toBe('mirai');
-    expect(config['prod-scaleway'].bootstrap_url).toBe('https://bootstrap.fake-domain.name');
+  test('profil prod : liste ORDONNEE bootstrap_urls (scaleway/dgx/onprem)', () => {
+    const urls = config.prod.bootstrap_urls;
+    expect(Array.isArray(urls)).toBe(true);
+    expect(urls.length).toBeGreaterThanOrEqual(2);
+    // Les 3 environnements sont presents dans la liste candidate.
+    expect(urls).toContain('https://bootstrap.apps.ocpbm02s2.cores.r2.pi2.minint.fr');
+    expect(urls).toContain('https://onyxia.gpu.minint.fr/bootstrap');
+    expect(urls).toContain('https://bootstrap.fake-domain.name');
   });
 
-  test('profil prod-dgx pointe Keycloak en direct (egress navigateur ouvert)', () => {
-    // L'egress navigateur DGX vers Keycloak/mcr est desormais ouvert : on pointe
-    // l'issuer directement sur le SSO (plus de relay), comme Scaleway.
-    expect(config['prod-dgx'].keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
-    expect(config['prod-dgx'].keycloakRealm).toBe('mirai');
-    expect(config['prod-dgx'].bootstrap_url).toBe('https://onyxia.gpu.minint.fr/bootstrap');
-    // Le relay n'est plus utilise par l'extension sur DGX.
-    expect(config['prod-dgx'].relayAssistantBaseUrl).toBeUndefined();
-  });
-
-  test('le config_path des profils prod pointe sur ?profile=prod (resolu par chaque DM)', () => {
-    expect(config['prod-dgx'].config_path).toContain('profile=prod');
-    expect(config['prod-scaleway'].config_path).toContain('profile=prod');
-    // Profil generique servi au runtime, avec placeholders resolus cote DM.
-    expect(config.prod.keycloakIssuerUrl).toBe('${{KEYCLOAK_ISSUER_URL}}');
+  test('profil prod : Keycloak SSO + parametres de scan', () => {
+    expect(config.prod.keycloakIssuerUrl).toContain('sso.mirai.interieur.gouv.fr');
+    expect(config.prod.keycloakRealm).toBe('mirai');
+    expect(config.prod.keycloakClientId).toBe('mirai-extension');
     expect(config.prod.relayAssistantBaseUrl).toBeUndefined();
+    // Parametres de la course echelonnee.
+    expect(typeof config.prod.bootstrap_stagger_ms).toBe('number');
+    expect(typeof config.prod.bootstrap_timeout_ms).toBe('number');
   });
 
-  test('les deux profils prod partagent le meme client Keycloak', () => {
-    expect(config['prod-scaleway'].keycloakClientId).toBe('mirai-extension');
-    expect(config['prod-dgx'].keycloakClientId).toBe('mirai-extension');
+  test('le config_path de prod pointe sur ?profile=prod (resolu par le DM gagnant)', () => {
+    expect(config.prod.config_path).toContain('profile=prod');
   });
 
-  test('chaque profil a un bootstrap_url et config_path', () => {
-    for (const p of ['dev', 'int', 'prod-scaleway', 'prod-dgx']) {
-      expect(config[p].bootstrap_url).toBeDefined();
+  test('chaque profil a de quoi joindre un DM (bootstrap_url ou bootstrap_urls) + config_path', () => {
+    // dev/int : URL unique ; prod : liste.
+    expect(config.dev.bootstrap_url).toBeDefined();
+    expect(config.int.bootstrap_url).toBeDefined();
+    expect(config.prod.bootstrap_urls).toBeDefined();
+    for (const p of ['dev', 'int', 'prod']) {
       expect(config[p].config_path).toBeDefined();
     }
   });
@@ -109,11 +112,41 @@ describe('dm/config.json', () => {
   });
 });
 
+describe('dm/dm-config.json (template DM)', () => {
+  const tpl = readSrcJSON('dm/dm-config.json');
+  const ENV_KEYS = ['keycloakIssuerUrl', 'keycloakRealm',
+    'keycloak_redirect_uri', 'keycloak_allowed_redirect_uri', 'apiBase'];
+
+  test('a le bon slug et configVersion', () => {
+    expect(tpl.slug).toBe('iassistant-direct-browser');
+    expect(tpl.configVersion).toBe(1);
+  });
+
+  test('chaque cle env des profils non-default est un placeholder ${{}}', () => {
+    for (const [prof, val] of Object.entries(tpl)) {
+      if (['configVersion', 'slug', '_description', 'default'].includes(prof)) continue;
+      if (typeof val !== 'object') continue;
+      for (const k of ENV_KEYS) {
+        if (val[k] === undefined) continue;
+        expect(val[k]).toMatch(/^\$\{\{.+\}\}$/);
+      }
+    }
+  });
+
+  test('keycloakClientId est mirai-extension en dur dans tous les profils', () => {
+    // ${{KEYCLOAK_CLIENT_ID}} est le client du DM (bootstrap-iassistant) : servi à l'extension,
+    // il cassait la connexion (403 à l'échange du code) et le rafraîchissement du jeton.
+    for (const prof of ['dev', 'int', 'prod']) {
+      expect(tpl[prof].keycloakClientId).toBe('mirai-extension');
+    }
+  });
+});
+
 describe('dm/manifest.json', () => {
   const manifest = readSrcJSON('dm/manifest.json');
 
-  test('a le slug mirai-browser', () => {
-    expect(manifest.slug).toBe('mirai-browser');
+  test('a le slug iassistant-direct-browser', () => {
+    expect(manifest.slug).toBe('iassistant-direct-browser');
   });
 
   test('a le device_type chrome', () => {
@@ -122,7 +155,7 @@ describe('dm/manifest.json', () => {
 
   test('a un changelog avec la version courante', () => {
     expect(manifest.changelog.length).toBeGreaterThanOrEqual(1);
-    expect(manifest.changelog[0].version).toBe('1.2.3');
+    expect(manifest.changelog[0].version).toBe('1.2.4');
   });
 
   test('a les key_features', () => {

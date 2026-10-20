@@ -1,27 +1,41 @@
 #!/usr/bin/env bash
-# register-dm.sh — Enregistre le plugin mirai-browser dans le Device Management
+# register-dm.sh — Enregistre le plugin iassistant-direct-browser dans le Device Management
 #
 # Usage:
-#   scripts/register-dm.sh                         → DM local (localhost:3001)
+#   scripts/register-dm.sh                         → enregistre le plugin (DM local localhost:8089)
 #   DM_URL=https://dm.example.gouv.fr scripts/register-dm.sh  → DM distant
+#   DM_QUEUE_ADMIN_TOKEN=xxx scripts/register-dm.sh --refresh-template
+#                                                  → met a jour UNIQUEMENT le config_template
+#                                                    d'un plugin existant (ne recree rien)
 #
 # Prerequis:
 #   - Le serveur DM doit etre accessible
-#   - Les fichiers src/dm/manifest.json et src/dm/config.json doivent exister
-#   - Optionnel: dist/mirai-browser-*.crx pour upload du binaire
+#   - Les fichiers src/dm/manifest.json et src/dm/dm-config.json doivent exister
+#   - --refresh-template requiert DM_QUEUE_ADMIN_TOKEN (header x-admin-token)
+#   - Optionnel: dist/iassistant-direct-browser-*.crx pour upload du binaire
 
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-DM_URL="${DM_URL:-http://localhost:3001}"
+DM_URL="${DM_URL:-http://localhost:8089}"
 MANIFEST="$ROOT_DIR/src/dm/manifest.json"
-CONFIG="$ROOT_DIR/src/dm/config.json"
+# config_template = le TEMPLATE DM (placeholders ${{...}}), PAS la config bakee client.
+CONFIG="$ROOT_DIR/src/dm/dm-config.json"
 
 [ -f "$MANIFEST" ] || { echo "ERREUR: $MANIFEST introuvable"; exit 1; }
 [ -f "$CONFIG" ] || { echo "ERREUR: $CONFIG introuvable"; exit 1; }
 
 SLUG=$(python3 -c "import json; print(json.load(open('$MANIFEST'))['slug'])")
 VERSION=$(python3 -c "import json; print(json.load(open('$ROOT_DIR/manifest.json'))['version'])")
+
+# Mode refresh : met a jour le config_template d'un plugin EXISTANT, sans le recreer.
+REFRESH_TEMPLATE=false
+for arg in "$@"; do
+  case "$arg" in
+    --refresh-template) REFRESH_TEMPLATE=true ;;
+  esac
+done
+ADMIN_TOKEN="${DM_QUEUE_ADMIN_TOKEN:-${DM_ADMIN_TOKEN:-}}"
 
 echo "============================================"
 echo " Enregistrement plugin dans Device Management"
@@ -30,6 +44,33 @@ echo " DM URL  : $DM_URL"
 echo " Slug    : $SLUG"
 echo " Version : $VERSION"
 echo ""
+
+# ──────────────────────────────────────────────
+# Mode --refresh-template : POST /admin/api/catalog/{id}/config-template
+# ──────────────────────────────────────────────
+if [ "$REFRESH_TEMPLATE" = true ]; then
+  echo "Mode: refresh config_template uniquement"
+  [ -n "$ADMIN_TOKEN" ] || { echo "ERREUR: DM_QUEUE_ADMIN_TOKEN requis pour --refresh-template"; exit 1; }
+  echo -n "Resolution plugin_id pour slug '$SLUG'... "
+  PLUGIN_ID=$(curl -sf "${DM_URL}/catalog/api/plugins" 2>/dev/null \
+    | python3 -c "import sys,json; ps=json.load(sys.stdin).get('plugins',[]); print(next((p['id'] for p in ps if p.get('slug')=='$SLUG'), ''))" 2>/dev/null)
+  [ -n "$PLUGIN_ID" ] || { echo "ECHEC"; echo "ERREUR: plugin_id introuvable via ${DM_URL}/catalog/api/plugins"; exit 1; }
+  echo "id=$PLUGIN_ID"
+  echo -n "POST config_template (depuis ${CONFIG##*/})... "
+  BODY=$(python3 -c "import json; print(json.dumps({'config_template': json.load(open('$CONFIG'))}, ensure_ascii=False))")
+  if curl -sf -X POST "${DM_URL}/admin/api/catalog/${PLUGIN_ID}/config-template" \
+       -H "x-admin-token: ${ADMIN_TOKEN}" \
+       -H "Content-Type: application/json" \
+       -d "$BODY" >/dev/null; then
+    echo "OK"
+    echo "Template rafraichi pour plugin_id=$PLUGIN_ID (slug $SLUG)."
+    exit 0
+  else
+    echo "ECHEC"
+    echo "ERREUR: POST config-template a echoue (verifier token / id / DM)."
+    exit 1
+  fi
+fi
 
 # ──────────────────────────────────────────────
 # 1. Verifier que le DM est accessible
@@ -138,10 +179,10 @@ if [[ "$RESPONSE" == *"ERROR"* ]]; then
   echo "   Intent       : (copier depuis src/dm/manifest.json)"
   echo ""
   echo "3. Dans le champ 'Config template', coller le contenu de :"
-  echo "   src/dm/config.json"
+  echo "   src/dm/dm-config.json"
   echo ""
   echo "4. Optionnel — uploader le binaire :"
-  CRX=$(ls "$ROOT_DIR/dist/mirai-browser-"*.crx 2>/dev/null | head -1)
+  CRX=$(ls "$ROOT_DIR/dist/iassistant-direct-browser-"*.crx 2>/dev/null | head -1)
   if [ -n "$CRX" ]; then
     echo "   $CRX"
   else
