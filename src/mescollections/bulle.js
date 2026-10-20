@@ -90,6 +90,8 @@
     .msg .etiquette { font-size: 12px; font-weight: 700; color: var(--texte-2); }
     .msg ul { padding-left: 20px; }
     .msg .reponse { white-space: pre-wrap; }
+    .msg .badge { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 10px;
+      background: #e3f6e5; color: #18753c; }
     .carte { background: var(--fond); border: 1px solid var(--bord); border-radius: 6px; padding: 7px 9px; }
     .carte strong { display: block; font-size: 13px; }
     .carte p { margin: 3px 0; font-size: 12.5px; color: var(--texte-2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -432,10 +434,18 @@
     return p ? p.titre : String(id || 'source');
   }
 
+  const reponseFiable = (plan) => (plan && typeof plan.reponse_fiable === 'object' && plan.reponse_fiable) || null;
+
   function rendrePlan(parent, plan, passages) {
     if (!plan || typeof plan !== 'object' || !Array.isArray(plan.etapes)) {
       parent.append(el('p', {}, typeof plan === 'string' ? plan : JSON.stringify(plan)));
       return;
+    }
+    const fiable = reponseFiable(plan);
+    if (fiable) {
+      // Réponse de référence servie telle quelle : aucune étape de recherche.
+      const score = typeof fiable.score === 'number' ? ` (ressemblance ${Math.round(fiable.score * 100)} %)` : '';
+      parent.append(el('p', {}, `Réponse fiable retenue${score} : aucune recherche`));
     }
     if (plan.consigne) {
       const score = typeof plan.score_consigne === 'number' ? ` (ressemblance ${Math.round(plan.score_consigne * 100)} %)` : '';
@@ -458,7 +468,9 @@
     if (p.titre) c.append(el('strong', {}, p.titre));
     if (p.texte) c.append(el('p', {}, p.texte));
     const pied = el('div', { className: 'pied' });
-    pied.append(el('span', {}, p.source || ''));
+    // Les passages d'un assistant portent l'id de la collection : titre de la cible si connue.
+    const cible = cibles.find((c) => c.id === p.source);
+    pied.append(el('span', {}, cible ? cible.titre : (p.source || '')));
     if (estHttps(p.url)) pied.append(lien(p.url, 'Ouvrir ↗'));
     c.append(pied);
     return c;
@@ -474,6 +486,7 @@
     }
     const passages = bloc.passages || [];
     // Réponse rédigée : texte simple, sans interprétation (aucune convention de citation fixée).
+    if (bloc.reponse && reponseFiable(bloc.plan)) m.append(el('span', { className: 'badge' }, 'Réponse fiable'));
     if (bloc.reponse) m.append(el('p', { className: 'reponse' }, bloc.reponse));
     if (passages.length) {
       if (bloc.reponse) m.append(el('div', { className: 'etiquette' }, 'Sources'));
