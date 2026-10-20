@@ -11,6 +11,8 @@ if (typeof importScripts === 'function') {
   try { importScripts('dm/bootstrap.js'); } catch (e) { console.warn('[MirAI] importScripts bootstrap.js:', e.message); }
   // Import recording.js functions (shared with popup)
   try { importScripts('recording.js'); } catch (e) { console.warn('[MirAI] importScripts recording.js:', e.message); }
+  // Mes collections (bulle « + IA ») : motifs, doublure, sites déclarés
+  try { importScripts('mescollections/correspond.js', 'mescollections/doublure.js', 'mescollections/sites.js'); } catch (e) { console.warn('[MirAI] importScripts mescollections:', e.message); }
 }
 
 self.addEventListener('install', () => self.skipWaiting());
@@ -109,12 +111,18 @@ api.alarms.onAlarm.addListener(async (alarm) => {
 // ======================================================================
 // Token refresh helper (used by overlay handlers)
 // ======================================================================
-async function _ensureTokenFresh() {
+/**
+ * Garantit un jeton d'accès frais (rafraîchissement silencieux si expiré).
+ * @param {{force?: boolean}} options - force : rafraîchit même si non expiré (401 reçu).
+ * @returns {Promise<object>} le token déchiffré {access_token, refresh_token, expires_in}
+ */
+async function _ensureTokenFresh(options = {}) {
   let miraiToken = await TokenStore.getToken();
   if (!miraiToken?.access_token) throw new Error('Non connecte (SSO)');
 
-  if (miraiToken.expires_in < Date.now() && miraiToken.refresh_token) {
-    console.info('[MirAI] Token expired, refreshing...');
+  const doitRafraichir = !!options.force || miraiToken.expires_in < Date.now();
+  if (doitRafraichir && miraiToken.refresh_token) {
+    console.info('[MirAI] Token expired or refresh forced, refreshing...');
     // Config via DMBootstrap en ASYNC : dans le service worker, _configCache peut
     // etre vide (SW relance) et _readLocalConfig (XHR sync) n'existe pas en SW —
     // getConfigAsync() relit le dmConfig PERSISTE (valeurs servies par le DM, ex.
@@ -152,6 +160,7 @@ async function _ensureTokenFresh() {
       throw new Error('Refresh token echoue');
     }
   }
+  return miraiToken;
 }
 
 // Store pending PKCE state
@@ -424,3 +433,135 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 });
+
+// ======================================================================
+// Mes collections — bulle « + IA » sur les pages déclarées
+// ======================================================================
+// La liste des motifs est lue par MesCollectionsSites (mescollections/sites.js) et
+// comparée ICI à l'adresse des onglets : aucune adresse visitée ne sort de l'extension.
+// La bulle n'est injectée que dans les onglets qui correspondent (cadre principal).
+// Mes collections ne répond pas ⇒ aucune bulle (état « injoignable »), retry planifié.
+const MC_CLE_ONGLETS = 'mescollectionsOnglets';
+// Chemin absolu : Firefox résout un chemin relatif depuis la page appelante.
+const MC_SCRIPT_BULLE = '/src/mescollections/bulle.js';
+let _mcSignature = null;
+
+function _mcDisponible() {
+  return typeof MesCollectionsSites !== 'undefined' && !!api.scripting && !!api.tabs;
+}
+
+function _mcSession() {
+  return api.storage.session || api.storage.local;
+}
+
+async function _mcJeton(forcer) {
+  try {
+    const t = await _ensureTokenFresh({ force: forcer });
+    return t?.access_token || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function _mcLireOnglets() {
+  const st = await _mcSession().get({ [MC_CLE_ONGLETS]: {} });
+  return st[MC_CLE_ONGLETS] || {};
+}
+
+async function _mcEvaluerOnglet(tabId, url) {
+  if (!_mcDisponible() || typeof tabId !== 'number' || !url) return;
+  const { cibles, etat } = await MesCollectionsSites.ciblesPour(url);
+  const onglets = await _mcLireOnglets();
+  if (cibles.length) {
+    try {
+      const resultats = await api.scripting.executeScript({ target: { tabId, frameIds: [0] }, files: [MC_SCRIPT_BULLE] });
+      // Firefox rend l'échec dans le résultat au lieu de rejeter la promesse.
+      if (resultats?.[0]?.error) throw new Error(String(resultats[0].error));
+      await api.tabs.sendMessage(tabId, { type: 'mescollections:afficher', cibles, etat }, { frameId: 0 });
+      onglets[tabId] = true;
+    } catch (e) {
+      // Page où l'injection est interdite (pages du navigateur, magasin, visionneuse PDF…) : rien.
+    }
+  } else if (onglets[tabId]) {
+    try { await api.tabs.sendMessage(tabId, { type: 'mescollections:retirer' }, { frameId: 0 }); } catch (e) { /* onglet déjà rechargé */ }
+    delete onglets[tabId];
+  } else {
+    return;
+  }
+  await _mcSession().set({ [MC_CLE_ONGLETS]: onglets });
+}
+
+async function _mcEvaluerTous() {
+  if (!_mcDisponible()) return;
+  let onglets = [];
+  try { onglets = await api.tabs.query({}); } catch (e) { return; }
+  for (const t of onglets) {
+    if (t.url) await _mcEvaluerOnglet(t.id, t.url);
+  }
+}
+
+if (_mcDisponible()) {
+  MesCollectionsSites.configurer({
+    obtenirJeton: _mcJeton,
+    surChangement(etat) {
+      // Ne réévalue les onglets que si l'état ou la liste a changé.
+      const signature = JSON.stringify([etat.etat, etat.sites]);
+      if (signature === _mcSignature) return;
+      _mcSignature = signature;
+      _mcEvaluerTous();
+    }
+  });
+
+  api.runtime.onInstalled.addListener(() => { MesCollectionsSites.lire(); });
+  if (api.runtime.onStartup) api.runtime.onStartup.addListener(() => { MesCollectionsSites.lire(); });
+
+  api.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === MesCollectionsSites.ALARME) MesCollectionsSites.lire();
+  });
+
+  // Connexion / déconnexion : apparition ou disparition du jeton (pas son simple rafraîchissement).
+  if (api.storage.onChanged) {
+    api.storage.onChanged.addListener((changes, zone) => {
+      if (zone !== 'local' || !changes.miraiToken) return;
+      const avant = !!changes.miraiToken.oldValue;
+      const apres = !!changes.miraiToken.newValue;
+      if (avant !== apres) MesCollectionsSites.reinitialiser();
+    });
+  }
+
+  api.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    // url : navigation, y compris dans une application monopage ; complete : nouveau document.
+    if (changeInfo.url || changeInfo.status === 'complete') return _mcEvaluerOnglet(tabId, tab?.url || changeInfo.url);
+  });
+
+  if (api.tabs.onRemoved) {
+    api.tabs.onRemoved.addListener(async (tabId) => {
+      const onglets = await _mcLireOnglets();
+      if (!onglets[tabId]) return;
+      delete onglets[tabId];
+      await _mcSession().set({ [MC_CLE_ONGLETS]: onglets });
+    });
+  }
+
+  // Page d'options : diagnostic et « Réessayer maintenant ». Réservé aux pages de l'extension.
+  api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg?.type !== 'mescollections:etat' && msg?.type !== 'mescollections:reessayer') return;
+    if (!sender?.url || !sender.url.startsWith(api.runtime.getURL(''))) return;
+    (async () => {
+      try {
+        const etat = msg.type === 'mescollections:reessayer'
+          ? await MesCollectionsSites.reinitialiser()
+          : await MesCollectionsSites.etat();
+        sendResponse({ ok: true, etat });
+      } catch (e) {
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
+    return true;
+  });
+
+  // Service worker réveillé : relit si l'état est absent ou périmé (l'alarme couvre le reste).
+  MesCollectionsSites.etat().then((e) => {
+    if (!e.derniereTentative) MesCollectionsSites.lire();
+  });
+}

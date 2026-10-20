@@ -1,0 +1,51 @@
+{
+  "_description": "Doublure de Mes collections pour développer sans serveur (option « Doublure » de la page d'options). Données fictives ; format du contrat, « _public » est propre à la doublure (simule le mode anonyme) (docs/plan-bulle-mes-collections.md §4).",
+  "sites": {
+    "ttl_s": 3600,
+    "anonyme": false,
+    "sites": [
+      {
+        "motif": "https://www.legifrance.gouv.fr/codes/*",
+        "cibles": [
+          { "type": "assistant", "id": "sejour-des-etrangers", "titre": "Séjour des étrangers" },
+          { "type": "collection", "id": "ceseda", "titre": "CESEDA", "_public": true }
+        ]
+      },
+      {
+        "motif": "https://*.fake-domain.name/*",
+        "cibles": [
+          { "type": "collection", "id": "exemple-public", "titre": "Collection d'exemple (publique)", "_public": true },
+          { "type": "assistant", "id": "assistant-exemple", "titre": "Assistant d'exemple" }
+        ]
+      }
+    ]
+  },
+  "search": {
+    "results": [
+      {
+        "titre": "Article L. 423-1 — Exemple de passage",
+        "extrait": "Texte fictif d'un passage trouvé dans la collection, pour le développement de la bulle.",
+        "url": "https://mescollections.fake-domain.name/extrait/1?exp=0&sig=exemple",
+        "collection": "ceseda"
+      },
+      {
+        "titre": "Article L. 423-2 — Second passage",
+        "extrait": "Autre extrait fictif, cité et cliquable.",
+        "url": "https://mescollections.fake-domain.name/extrait/2?exp=0&sig=exemple",
+        "collection": "ceseda"
+      }
+    ]
+  },
+  "executer": {
+    "reponse": null,
+    "plan": ["Collections consultées : CESEDA", "Recherche : « titre de séjour »", "2 passages retenus"],
+    "passages": [
+      {
+        "titre": "Article L. 423-1 — Exemple de passage",
+        "texte": "Texte fictif d'un passage retenu par l'assistant.",
+        "url": "https://mescollections.fake-domain.name/extrait/1?exp=0&sig=exemple",
+        "source": "ceseda"
+      }
+    ]
+  }
+}

@@ -325,3 +325,68 @@ document.addEventListener('DOMContentLoaded', () => {
   renderList();
   renderActiveConfig();
 })();
+
+// ======================================================================
+// Mes collections — diagnostic de la bulle « + IA »
+// ======================================================================
+(function initMesCollectionsSection() {
+  const table = document.getElementById('mc-etat');
+  if (!table) return;
+  const B = (typeof browser !== 'undefined') ? browser : chrome;
+  const reessayer = document.getElementById('mc-reessayer');
+  const doublure = document.getElementById('mc-doublure');
+
+  const LIBELLES = {
+    connecte: 'Actif',
+    anonyme: 'Actif en mode anonyme',
+    injoignable: 'Mes collections ne répond pas',
+    refuse: 'Jeton refusé',
+    inactif: 'Inactif'
+  };
+  const date = (t) => (t ? new Date(t).toLocaleString() : '—');
+
+  function rendre(e) {
+    const lignes = [
+      ['État', LIBELLES[e.etat] || e.etat],
+      ['Détail', e.raison || '—'],
+      ['Sites déclarés', String((e.sites || []).length)],
+      ['Dernière réponse', date(e.derniereReponse)],
+      ['Échecs consécutifs', String(e.echecs || 0)],
+      ['Prochaine tentative', date(e.prochaineTentative)]
+    ];
+    table.textContent = '';
+    for (const [k, v] of lignes) {
+      const tr = document.createElement('tr');
+      const tdK = document.createElement('td');
+      tdK.textContent = k;
+      const tdV = document.createElement('td');
+      tdV.textContent = v;
+      tr.append(tdK, tdV);
+      table.append(tr);
+    }
+  }
+
+  async function demander(type) {
+    try {
+      const r = await B.runtime.sendMessage({ type });
+      if (r?.ok) rendre(r.etat);
+      else table.textContent = 'État indisponible.';
+    } catch (e) {
+      table.textContent = 'État indisponible.';
+    }
+  }
+
+  reessayer.addEventListener('click', async () => {
+    reessayer.disabled = true;
+    await demander('mescollections:reessayer');
+    reessayer.disabled = false;
+  });
+
+  doublure.addEventListener('change', async () => {
+    await B.storage.local.set({ mescollectionsDoublure: doublure.value });
+    await demander('mescollections:reessayer');
+  });
+
+  B.storage.local.get({ mescollectionsDoublure: '' }).then((st) => { doublure.value = st.mescollectionsDoublure || ''; });
+  demander('mescollections:etat');
+})();
