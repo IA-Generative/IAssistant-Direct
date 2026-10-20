@@ -12,7 +12,7 @@ if (typeof importScripts === 'function') {
   // Import recording.js functions (shared with popup)
   try { importScripts('recording.js'); } catch (e) { console.warn('[MirAI] importScripts recording.js:', e.message); }
   // Mes collections (bulle « + IA ») : motifs, doublure, sites déclarés
-  try { importScripts('mescollections/correspond.js', 'mescollections/doublure.js', 'mescollections/sites.js'); } catch (e) { console.warn('[MirAI] importScripts mescollections:', e.message); }
+  try { importScripts('mescollections/correspond.js', 'mescollections/doublure.js', 'mescollections/sites.js', 'mescollections/api.js'); } catch (e) { console.warn('[MirAI] importScripts mescollections:', e.message); }
 }
 
 self.addEventListener('install', () => self.skipWaiting());
@@ -526,6 +526,44 @@ async function _mcEvaluerOnglet(tabId, url) {
   await _mcSession().set({ [MC_CLE_ONGLETS]: onglets });
 }
 
+const MC_MAX_ECHANGES = 30;
+
+function _mcCleConversation(tabId) {
+  return 'mescollectionsConversation:' + tabId;
+}
+
+async function _mcEffacerConversations() {
+  try {
+    const tout = await _mcSession().get(null);
+    const cles = Object.keys(tout || {}).filter((k) => k.startsWith('mescollectionsConversation:'));
+    if (cles.length) await _mcSession().remove(cles);
+  } catch (e) { /* rien à effacer */ }
+}
+
+async function _mcDemander(tabId, url, msg) {
+  const onglets = await _mcLireOnglets();
+  if (!onglets[tabId]) return { ok: false, erreur: { code: 'interdit', message: 'Bulle inactive sur cette page.' } };
+  const { cibles, etat } = await MesCollectionsSites.ciblesPour(url);
+  if (etat !== 'connecte') {
+    return { ok: false, erreur: { code: 'connexion', message: 'Connectez-vous pour poser une question.' } };
+  }
+  const voulues = Array.isArray(msg.cibles) ? msg.cibles : [];
+  const choisies = cibles.filter((c) => voulues.some((v) => v && v.type === c.type && v.id === c.id));
+  if (!choisies.length) return { ok: false, erreur: { code: 'cibles', message: 'Aucune source cochée pour cette page.' } };
+
+  const cfg = await MesCollectionsSites.configuration();
+  const { blocs } = await MesCollectionsApi.demander(cfg, choisies, msg.question);
+  // Panne pendant une question : relecture immédiate des sites (la bulle se retire si elle échoue aussi).
+  if (blocs.some((b) => b.erreur && b.erreur.panne)) MesCollectionsSites.lire();
+
+  const echange = { question: String(msg.question || '').trim().slice(0, 4000), blocs, t: Date.now() };
+  const cle = _mcCleConversation(tabId);
+  const st = await _mcSession().get({ [cle]: [] });
+  const conversation = (st[cle] || []).concat([echange]).slice(-MC_MAX_ECHANGES);
+  await _mcSession().set({ [cle]: conversation });
+  return { ok: true, echange };
+}
+
 async function _mcEvaluerTous() {
   if (!_mcDisponible()) return;
   let onglets = [];
@@ -560,7 +598,9 @@ if (_mcDisponible()) {
       if (zone !== 'local' || !changes.miraiToken) return;
       const avant = !!changes.miraiToken.oldValue;
       const apres = !!changes.miraiToken.newValue;
-      if (avant !== apres) MesCollectionsSites.reinitialiser();
+      if (avant === apres) return;
+      if (!apres) _mcEffacerConversations();   // déconnexion : rien de la session précédente ne reste affiché
+      MesCollectionsSites.reinitialiser();
     });
   }
 
@@ -571,12 +611,44 @@ if (_mcDisponible()) {
 
   if (api.tabs.onRemoved) {
     api.tabs.onRemoved.addListener(async (tabId) => {
+      // La conversation de l'onglet est effacée avec lui.
+      await _mcSession().remove(_mcCleConversation(tabId));
       const onglets = await _mcLireOnglets();
       if (!onglets[tabId]) return;
       delete onglets[tabId];
       await _mcSession().set({ [MC_CLE_ONGLETS]: onglets });
     });
   }
+
+  if (typeof MesCollectionsApi !== 'undefined') MesCollectionsApi.configurer({ obtenirJeton: _mcJeton });
+
+  // Bulle (content script) : questions et conversation de l'onglet. Cadre principal d'un
+  // onglet porteur seulement ; les cibles demandées sont recoupées avec celles de la page.
+  api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    const types = ['mescollections:demander', 'mescollections:conversation', 'mescollections:effacer'];
+    if (!types.includes(msg?.type)) return;
+    const tabId = sender?.tab?.id;
+    if (typeof tabId !== 'number' || sender.frameId !== 0) return;
+    (async () => {
+      try {
+        const cle = _mcCleConversation(tabId);
+        if (msg.type === 'mescollections:effacer') {
+          await _mcSession().remove(cle);
+          sendResponse({ ok: true });
+          return;
+        }
+        if (msg.type === 'mescollections:conversation') {
+          const st = await _mcSession().get({ [cle]: [] });
+          sendResponse({ ok: true, conversation: st[cle] || [] });
+          return;
+        }
+        sendResponse(await _mcDemander(tabId, sender.tab.url, msg));
+      } catch (e) {
+        sendResponse({ ok: false, erreur: { code: 'interne', message: 'Erreur interne de l\'extension.' } });
+      }
+    })();
+    return true;
+  });
 
   // Page d'options : diagnostic et « Réessayer maintenant ». Réservé aux pages de l'extension.
   api.runtime.onMessage.addListener((msg, sender, sendResponse) => {

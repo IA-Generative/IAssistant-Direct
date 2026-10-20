@@ -68,6 +68,23 @@ première de ces actions.
 4. **Enregistrement** — bouton REC (overlay) → API mcr (`createMeeting`,
    `startCapture`).
 
+### 3.1 Action assistée : la bulle « + IA » de Mes collections
+
+Deuxième action du socle. Plan et contrat : [`plan-bulle-mes-collections.md`](plan-bulle-mes-collections.md).
+
+- **Détection locale** : l'arrière-plan lit `GET {mycollectionsApiBase}/api/v1/sites` (motifs
+  déclarés sur les fiches de Mes collections) et compare **lui-même** l'adresse des onglets.
+  Aucune adresse visitée n'est envoyée.
+- **Injection à la demande** (`scripting`) de `src/mescollections/bulle.js` dans le cadre
+  principal des seuls onglets qui correspondent ; interface en Shadow DOM fermé, sans `innerHTML`.
+- **Inerte si Mes collections ne répond pas** : plus de bulle, nouvelle tentative par recul
+  exponentiel (1 → 60 min, `chrome.alarms`). **Mode anonyme** (liste seule) si le jeton n'est
+  pas actif ; `audience_mismatch` = état « refusé » visible dans la page d'options.
+- **Questions** : jeton de la personne, depuis l'arrière-plan ; conversation par onglet dans
+  `storage.session`, effacée à la fermeture de l'onglet et à la déconnexion.
+- **Développement** : doublure (`src/mescollections/doublure.json`) choisie dans la page d'options.
+- **Adresse** de Mes collections bakée en attendant le Device Management (issue #5).
+
 ---
 
 ## 4. Environnements & profils
@@ -209,6 +226,8 @@ en cas d'échec/timeout. Pas besoin d'IP anycast ni de GSLB.
 | **Onboarding utilisateur** | l'utilisateur ne savait pas se connecter | **wizard** overlay (page visio) + **page de bienvenue** (1er lancement) |
 | **Health-check DM** | sondait l'URL publique + mauvais port → faux `degraded` | sonder les vrais endpoints (proxy/realm, port du service) |
 | **Secrets** | valeurs réelles committées | gitignore + `.example` ; scrub d'historique + **rotation** |
+| **Firefox ESR** | `background.service_worker` refusé : l'extension ne s'installait pas | déclarer aussi `background.scripts` ; `importScripts` seulement s'il existe |
+| **Injection sous Firefox** | `executeScript({files})` relatif à la page appelante ; `adoptedStyleSheets` refusé depuis un content script | chemin absolu `/src/…` ; repli sur `<style>` dans le Shadow DOM |
 | **Erreur `redirect_uri` vide** | venait d'une **app web** (client `bootstrap-iassistant`), pas de l'extension | corriger le `redirect_uri` + Valid URIs **côté app web**, pas l'extension |
 
 ---

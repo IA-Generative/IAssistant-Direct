@@ -382,6 +382,15 @@ document.addEventListener('DOMContentLoaded', () => {
     reessayer.disabled = false;
   });
 
+  // « Masquer sur ce site » (menu de la bulle) : liste remise à zéro ici.
+  const reafficher = document.getElementById('mc-reafficher');
+  reafficher.addEventListener('click', async () => {
+    const st = await B.storage.local.get({ mescollectionsBulle: null });
+    const prefs = Object.assign({}, st.mescollectionsBulle || {}, { masques: [] });
+    await B.storage.local.set({ mescollectionsBulle: prefs });
+    reafficher.textContent = 'Bulle réaffichée';
+  });
+
   doublure.addEventListener('change', async () => {
     await B.storage.local.set({ mescollectionsDoublure: doublure.value });
     await demander('mescollections:reessayer');

@@ -46,7 +46,8 @@ describe('manifest.json', () => {
 
   test('background.scripts couvre les modules importés par le service worker', () => {
     const bg = readSrc('background.js');
-    const importes = [...bg.matchAll(/importScripts\('([^']+)'\)/g)].map((m) => 'src/' + m[1]);
+    const importes = [...bg.matchAll(/importScripts\(([^)]*)\)/g)]
+      .flatMap((m) => [...m[1].matchAll(/'([^']+)'/g)].map((a) => 'src/' + a[1]));
     expect(importes.length).toBeGreaterThan(0);
     for (const f of importes) {
       expect(manifest.background.scripts).toContain(f);
