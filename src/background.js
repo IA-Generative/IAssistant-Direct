@@ -149,6 +149,13 @@ async function _ensureTokenFresh() {
   }
 }
 
+// Connexion PKCE en attente (overlay:pkceLogin), persistée hors mémoire du service worker.
+const PKCE_CLE = 'pkceEnAttente';
+const PKCE_VALIDITE_MS = 10 * 60 * 1000;
+function _pkceStockage() {
+  return api.storage.session || api.storage.local;
+}
+
 // Store pending PKCE state
 let _pendingPkceCode = null;
 let _pendingPkceVerifier = null;
@@ -165,44 +172,60 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg?.type === 'pkce:callback' && msg.code) {
     console.info('[MirAI] PKCE callback received, code:', msg.code.substring(0, 8) + '...');
-    _pendingPkceCode = msg.code;
+    (async () => {
+      // Connexion lancée par overlay:pkceLogin : état en mémoire, sinon relu du stockage
+      // (service worker redémarré entre-temps).
+      let attente = _pendingPkceVerifier && _pendingPkceTokenUrl
+        ? { verifier: _pendingPkceVerifier, redirectUri: _pendingPkceRedirectUri, clientId: _pendingPkceClientId, tokenUrl: _pendingPkceTokenUrl }
+        : null;
+      if (!attente) {
+        const st = await _pkceStockage().get({ [PKCE_CLE]: null });
+        const e = st[PKCE_CLE];
+        if (e && Date.now() - e.t < PKCE_VALIDITE_MS) attente = e;
+      }
+      _pendingPkceVerifier = null;
+      _pendingPkceRedirectUri = null;
+      _pendingPkceClientId = null;
+      _pendingPkceTokenUrl = null;
+      await _pkceStockage().remove(PKCE_CLE);
 
-    // If we have a pending verifier (from overlay:pkceLogin), exchange immediately
-    if (_pendingPkceVerifier && _pendingPkceTokenUrl) {
-      (async () => {
-        try {
-          const resp = await fetch(_pendingPkceTokenUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              grant_type: 'authorization_code',
-              client_id: _pendingPkceClientId,
-              code: msg.code,
-              redirect_uri: _pendingPkceRedirectUri,
-              code_verifier: _pendingPkceVerifier
-            })
-          });
-          if (resp.ok) {
-            const data = await resp.json();
-            await TokenStore.storeToken({
-              access_token: data.access_token,
-              refresh_token: data.refresh_token,
-              expires_in: Date.now() + (data.expires_in * 1000)
-            });
-            console.info('[MirAI] Token obtained via overlay PKCE login.');
-          }
-        } catch (e) {
-          console.error('[MirAI] Token exchange failed:', e);
+      if (!attente) {
+        // Connexion lancée par le popup : il récupère le code par pkce:getCode.
+        _pendingPkceCode = msg.code;
+        sendResponse({ ok: true });
+        return;
+      }
+      try {
+        const resp = await fetch(attente.tokenUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            client_id: attente.clientId,
+            code: msg.code,
+            redirect_uri: attente.redirectUri,
+            code_verifier: attente.verifier
+          })
+        });
+        if (!resp.ok) {
+          console.warn('[MirAI] Token exchange refused:', resp.status);
+          sendResponse({ ok: false, error: `Échange du code refusé par le serveur de connexion (${resp.status}).` });
+          return;
         }
-        _pendingPkceVerifier = null;
-        _pendingPkceRedirectUri = null;
-        _pendingPkceClientId = null;
-        _pendingPkceTokenUrl = null;
-      })();
-    }
-
-    sendResponse({ ok: true });
-    return;
+        const data = await resp.json();
+        await TokenStore.storeToken({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          expires_in: Date.now() + (data.expires_in * 1000)
+        });
+        console.info('[MirAI] Token obtained via overlay PKCE login.');
+        sendResponse({ ok: true });
+      } catch (e) {
+        console.error('[MirAI] Token exchange failed:', e.message);
+        sendResponse({ ok: false, error: 'Échange du code impossible : ' + e.message });
+      }
+    })();
+    return true;
   }
 
   if (msg?.type === 'pkce:getCode') {
@@ -408,6 +431,11 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         _pendingPkceRedirectUri = callbackUrl;
         _pendingPkceClientId = clientId;
         _pendingPkceTokenUrl = `${authBase}/protocol/openid-connect/token`;
+        // Persisté aussi : le service worker s'arrête après ~30 s d'inactivité, souvent
+        // pendant que la personne saisit son mot de passe, et les variables ci-dessus sont perdues.
+        await _pkceStockage().set({ [PKCE_CLE]: {
+          verifier: codeVerifier, redirectUri: callbackUrl, clientId, tokenUrl: _pendingPkceTokenUrl, t: Date.now()
+        } });
 
         api.tabs.create({ url: authUrl });
         sendResponse({ ok: true });
