@@ -103,6 +103,12 @@ arrive, elle est affichée en texte simple, sans interpréter de convention de c
 « Étape n : <source> — k passage(s) » (avec « après les étapes … » si `attend`), et
 « N source(s) non interrogée(s) » sans jamais les nommer.
 
+Réponse fiable : un assistant peut servir une réponse de référence. `executer` rend alors
+`reponse` (texte simple), `passages: []`, `plan.reponse_fiable = {id, score}` et
+`plan.etapes == []`. La bulle affiche la réponse avec le badge « Réponse fiable » et, sous
+« Comment l'assistant a cherché », « Réponse fiable retenue (ressemblance N %) : aucune
+recherche » (N = arrondi de `score` × 100).
+
 Limites : `executer` et `plan`, 30 questions par personne et par minute (429 +
 `Retry-After`) ; un 503 « moteur en panne » porte `Retry-After: 10`.
 

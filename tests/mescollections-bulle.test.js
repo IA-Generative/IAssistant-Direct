@@ -130,3 +130,23 @@ test('opacité au repos par défaut à 35 %, réglée depuis le popup sans recha
   await attendre();
   expect(document.querySelector('mescollections-bulle')).not.toBeNull();
 });
+
+test('réponse fiable : badge, texte tel quel, plan « aucune recherche »', async () => {
+  chrome.runtime.sendMessage = jest.fn((msg, cb) => {
+    const rep = msg.type === 'mescollections:conversation' ? { ok: true, conversation: [{
+      question: 'q', t: Date.now(),
+      blocs: [{
+        type: 'assistant', cibles: [{ type: 'assistant', id: 'sejour', titre: 'Séjour' }],
+        reponse: 'Réponse de référence [1]', passages: [],
+        plan: { ...PLAN, etapes: [], consigne: null, sources_ignorees: 0, reponse_fiable: { id: 'rf-12', score: 0.914 } }
+      }]
+    }] } : { ok: true };
+    if (cb) cb(rep);
+    return undefined;
+  });
+  await ouvrir();
+  expect(racine.querySelector('.badge').textContent).toBe('Réponse fiable');
+  expect(racine.querySelector('.reponse').textContent).toBe('Réponse de référence [1]');
+  expect(racine.querySelector('details.plan').textContent).toContain('Réponse fiable retenue (ressemblance 91 %) : aucune recherche');
+  expect(racine.textContent).not.toContain('Rien de pertinent');
+});
