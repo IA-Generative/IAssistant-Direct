@@ -39,8 +39,15 @@ Les `${{VARNAME}}` du template sont résolus par le DM au `GET /config/{slug}/co
 **liste des noms de variables** ; elle doit être identique des deux côtés.
 
 Variables attendues (extension) : `KEYCLOAK_ISSUER_URL`, `KEYCLOAK_REALM`,
-`KEYCLOAK_CLIENT_ID`, `API_BASE`, `RELAY_ASSISTANT_BASE_URL`, `COMPTE_RENDU_URL`,
+`API_BASE`, `RELAY_ASSISTANT_BASE_URL`, `COMPTE_RENDU_URL`,
 `COMU_URL`, `TELEMETRY_ENDPOINT`, `TELEMETRY_KEY`.
+
+**Exception : `keycloakClientId` est en dur (`mirai-extension`).** La variable
+`KEYCLOAK_CLIENT_ID` du DM désigne le client du DM lui-même (`bootstrap-iassistant`,
+partagé avec le plug-in LibreOffice). Servie à l'extension, elle lui faisait demander la
+connexion au nom d'un autre client : échange du code refusé (403) et rafraîchissement du
+jeton impossible. Le client de l'extension ne varie pas selon l'environnement : il est lié
+à son identifiant et à ses adresses de retour.
 
 > `KEYCLOAK_REDIRECT_URI` / `KEYCLOAK_ALLOWED_REDIRECT_URI` ne figurent **pas** dans le
 > template de l'extension : celle-ci calcule son redirect via `chrome.identity` (cf. §6).
