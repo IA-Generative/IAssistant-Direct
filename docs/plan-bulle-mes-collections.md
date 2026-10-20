@@ -197,7 +197,7 @@ seul endroit où une panne est visible.
 - **TODO** : la faire servir par le Device Management (placeholder
   `${{MYCOLLECTIONS_API_BASE}}` dans `src/dm/dm-config.json`, variable d'environnement
   côté DM, liste des variables dans `docs/adr-plugin-dm-integration.md`). Suivi
-  dans une issue dédiée.
+  dans l'issue #5.
 - `mycollectionsDoublure: true` ⇒ `sites.js` et `api.js` lisent `doublure.json`
   (`runtime.getURL`) au lieu du réseau.
 
