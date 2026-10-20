@@ -15,6 +15,7 @@
   const HOTE = location.hostname;                 // clé de mémoire par site, jamais envoyée
   const LARGEUR_DEFAUT = 380, HAUTEUR_DEFAUT = 520, LARGEUR_MIN = 300, HAUTEUR_MIN = 320, MARGE = 16;
   const APPUI_LONG_MS = 600;
+  const OPACITE_DEFAUT = 0.35, OPACITE_MIN = 0.1;
   const LIENS_VALIDES_MS = 12 * 3600 * 1000;      // durée des liens signés (contrat)
 
   const STYLE = `
@@ -37,13 +38,13 @@
     .bulle {
       position: fixed; right: ${MARGE}px; z-index: 2147483646; width: 44px; height: 44px; border-radius: 50%;
       border: 0; padding: 0; display: flex; align-items: center; justify-content: center; gap: 1px;
-      background: rgba(0, 0, 145, .7); color: #fff; font-weight: 700; font-size: 11px; white-space: nowrap; cursor: pointer;
+      background: rgb(0, 0, 145); color: #fff; font-weight: 700; font-size: 11px; white-space: nowrap; cursor: pointer;
       backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
-      touch-action: none; user-select: none; transition: background-color .15s;
+      touch-action: none; user-select: none; transition: opacity .15s;
+      opacity: var(--repos, ${OPACITE_DEFAUT});   /* transparence au repos, réglable dans le popup */
     }
-    .bulle:hover, .bulle:focus-visible { background: rgb(0, 0, 145); }
-    .bulle.anonyme { background: rgba(102, 102, 102, .7); }
-    .bulle.anonyme:hover, .bulle.anonyme:focus-visible { background: rgb(102, 102, 102); }
+    .bulle:hover, .bulle:focus-visible { opacity: 1; }
+    .bulle.anonyme { background: rgb(102, 102, 102); }
     .bulle img { width: 12px; height: 12px; }
     .bulle[hidden], .panneau[hidden], .menu[hidden], [hidden] { display: none !important; }
 
@@ -128,12 +129,20 @@
   });
 
   // ── Préférences (storage.local de l'extension, pas celui de la page) ──
-  let prefs = { positions: {}, masques: [], taille: null };
+  // positions (par site), masques (sites où la bulle est cachée), taille du panneau,
+  // opacite de la bulle au repos (0.1 à 1). Le popup modifie masques et opacite.
+  const PREFS_DEFAUT = { positions: {}, masques: [], taille: null, opacite: OPACITE_DEFAUT };
+  let prefs = Object.assign({}, PREFS_DEFAUT);
+  const fusionnerPrefs = (brut) => { prefs = Object.assign({}, PREFS_DEFAUT, brut || {}); };
   const lirePrefs = async () => {
     try {
       const st = await B.storage.local.get({ [CLE_PREFS]: null });
-      prefs = Object.assign({ positions: {}, masques: [], taille: null }, st[CLE_PREFS] || {});
+      fusionnerPrefs(st[CLE_PREFS]);
     } catch (e) { /* valeurs par défaut */ }
+  };
+  const opacite = () => {
+    const o = Number(prefs.opacite);
+    return Number.isFinite(o) ? Math.min(1, Math.max(OPACITE_MIN, o)) : OPACITE_DEFAUT;
   };
   const garderPrefs = () => { try { B.storage.local.set({ [CLE_PREFS]: prefs }); } catch (e) { /* sans mémoire */ } };
 
@@ -202,7 +211,7 @@
     racine.append(bulle, menu, panneau);
     (document.body || document.documentElement).append(hote);
     racineDom = hote;
-    ui = { bulle, menu, masquer, annuler, panneau, poignee, titre, effacer, reduire, choix, fil, saisie, champ, envoyer, selection, connexion, seConnecter };
+    ui = { racine, bulle, menu, masquer, annuler, panneau, poignee, titre, effacer, reduire, choix, fil, saisie, champ, envoyer, selection, connexion, seConnecter };
     brancher();
   }
 
@@ -530,7 +539,10 @@
   }
 
   // ── Afficher / retirer (messages de l'arrière-plan) ──────────────────
+  let derniereDemande = null;   // dernières cibles reçues : la bulle revient si le site est démasqué
+
   async function afficher(nouvelles, nouvelEtat) {
+    derniereDemande = { cibles: nouvelles, etat: nouvelEtat };
     await lirePrefs();
     if (prefs.masques.includes(HOTE)) return;
     if (!ui) construire();
@@ -542,6 +554,7 @@
     ui.bulle.setAttribute('aria-label', libelle);
     ui.saisie.hidden = etat === 'anonyme';
     ui.connexion.hidden = etat !== 'anonyme';
+    ui.racine.style.setProperty('--repos', String(opacite()));
     placerBulle();
     rendreCibles();
   }
@@ -554,6 +567,18 @@
 
   B.runtime.onMessage.addListener((msg) => {
     if (msg?.type === 'mescollections:afficher' && Array.isArray(msg.cibles)) afficher(msg.cibles, msg.etat);
-    else if (msg?.type === 'mescollections:retirer') retirer();
+    else if (msg?.type === 'mescollections:retirer') { derniereDemande = null; retirer(); }
   });
+
+  // Réglages changés ailleurs (popup) : transparence appliquée, site masqué ou démasqué.
+  if (B.storage.onChanged) {
+    B.storage.onChanged.addListener((changes, zone) => {
+      if (zone !== 'local' || !changes[CLE_PREFS]) return;
+      fusionnerPrefs(changes[CLE_PREFS].newValue);
+      const masque = prefs.masques.includes(HOTE);
+      if (masque && ui) retirer();
+      else if (!masque && !ui && derniereDemande) afficher(derniereDemande.cibles, derniereDemande.etat);
+      else if (ui) ui.racine.style.setProperty('--repos', String(opacite()));
+    });
+  }
 })();

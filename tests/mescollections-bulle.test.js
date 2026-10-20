@@ -106,3 +106,27 @@ test('aucun innerHTML dans le code de la bulle', () => {
   const code = fs.readFileSync(path.join(__dirname, '..', 'src', 'mescollections', 'bulle.js'), 'utf8');
   expect(code).not.toMatch(/\.innerHTML|insertAdjacentHTML|outerHTML\s*=/);
 });
+
+test('opacité au repos par défaut à 35 %, réglée depuis le popup sans recharger', async () => {
+  chrome.storage.onChanged = { addListener: jest.fn() };
+  delete globalThis.__mesCollectionsBulle;
+  document.body.textContent = '';
+  chrome.runtime.onMessage.addListener.mockClear();
+  eval(fs.readFileSync(path.join(__dirname, '..', 'src', 'mescollections', 'bulle.js'), 'utf8'));
+  const message = chrome.runtime.onMessage.addListener.mock.calls[0][0];
+  const reglage = chrome.storage.onChanged.addListener.mock.calls[0][0];
+  message({ type: 'mescollections:afficher', cibles: CIBLES, etat: 'connecte' });
+  await attendre();
+  const couche = racine.querySelector('.racine');
+  expect(couche.style.getPropertyValue('--repos')).toBe('0.35');
+
+  reglage({ mescollectionsBulle: { newValue: { masques: [], opacite: 0.6 } } }, 'local');
+  expect(couche.style.getPropertyValue('--repos')).toBe('0.6');
+
+  reglage({ mescollectionsBulle: { newValue: { masques: [location.hostname], opacite: 0.6 } } }, 'local');
+  expect(document.querySelector('mescollections-bulle')).toBeNull();
+
+  reglage({ mescollectionsBulle: { newValue: { masques: [], opacite: 0.6 } } }, 'local');
+  await attendre();
+  expect(document.querySelector('mescollections-bulle')).not.toBeNull();
+});

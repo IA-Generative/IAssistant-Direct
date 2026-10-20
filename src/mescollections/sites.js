@@ -201,7 +201,7 @@
     return _enCours;
   }
 
-  /** Remet le compteur d'échecs à zéro (connexion, « Réessayer maintenant ») puis relit. */
+  /** Remet le compteur d'échecs à zéro (connexion, « Mettre à jour la liste ») puis relit. */
   async function reinitialiser() {
     const e = await etat();
     await B().storage.local.set({ [CLE_ETAT]: Object.assign({}, e, { echecs: 0 }) });
