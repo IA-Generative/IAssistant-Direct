@@ -175,7 +175,9 @@ import json, os, sys
 os.chdir('$EXT_DIR')
 m = json.load(open('manifest.json'))
 errors = []
-for f in [m['background']['service_worker'], m['action']['default_popup'], m['options_ui']['page']]:
+refs = [m['background']['service_worker'], m['action']['default_popup'], m['options_ui']['page']]
+refs += m['background'].get('scripts', [])  # Firefox ESR (pas de service worker)
+for f in refs:
     if not os.path.isfile(f): errors.append(f)
 for s, p in m['icons'].items():
     if not os.path.isfile(p): errors.append(p)

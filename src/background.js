@@ -1,12 +1,17 @@
 // background.js — service worker (pas de DOM ici)
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
-// Import crypto.js (TokenStore) FIRST — recording.js et les handlers token en dépendent.
-try { importScripts('crypto.js'); } catch (e) { console.warn('[MirAI] importScripts crypto.js:', e.message); }
-// Import DMBootstrap (client config DM) — source unique de la config (issuer/realm…)
-try { importScripts('dm/bootstrap.js'); } catch (e) { console.warn('[MirAI] importScripts bootstrap.js:', e.message); }
-// Import recording.js functions (shared with popup)
-try { importScripts('recording.js'); } catch (e) { console.warn('[MirAI] importScripts recording.js:', e.message); }
+// Chrome (service worker) : les modules partagés sont importés ici.
+// Firefox ESR (pas de service worker) : ils sont listés dans manifest `background.scripts`
+// AVANT background.js, et importScripts n'existe pas dans une page d'arrière-plan.
+if (typeof importScripts === 'function') {
+  // Import crypto.js (TokenStore) FIRST — recording.js et les handlers token en dépendent.
+  try { importScripts('crypto.js'); } catch (e) { console.warn('[MirAI] importScripts crypto.js:', e.message); }
+  // Import DMBootstrap (client config DM) — source unique de la config (issuer/realm…)
+  try { importScripts('dm/bootstrap.js'); } catch (e) { console.warn('[MirAI] importScripts bootstrap.js:', e.message); }
+  // Import recording.js functions (shared with popup)
+  try { importScripts('recording.js'); } catch (e) { console.warn('[MirAI] importScripts recording.js:', e.message); }
+}
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
