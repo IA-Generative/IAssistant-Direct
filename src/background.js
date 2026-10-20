@@ -211,8 +211,11 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           })
         });
         if (!resp.ok) {
-          console.warn('[MirAI] Token exchange refused:', resp.status);
-          sendResponse({ ok: false, error: `Échange du code refusé par le serveur de connexion (${resp.status}).` });
+          // Champ `error` de Keycloak (jamais de jeton dans une réponse en erreur).
+          let raison = '';
+          try { const e = await resp.json(); raison = [e.error, e.error_description].filter(Boolean).join(' : '); } catch (_) { /* corps non JSON */ }
+          console.warn('[MirAI] Token exchange refused:', resp.status, raison);
+          sendResponse({ ok: false, error: `Échange du code refusé par le serveur de connexion (${resp.status}${raison ? ' — ' + raison : ''}).` });
           return;
         }
         const data = await resp.json();

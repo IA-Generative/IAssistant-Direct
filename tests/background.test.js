@@ -246,9 +246,10 @@ describe('PKCE : service worker redémarré pendant la connexion', () => {
   test('échange refusé : l\'échec est rendu à la page de retour', async () => {
     __seedChromeStorage({ pkceEnAttente: { ...ATTENTE, t: Date.now() } });
     loadBackground();
-    global.fetch = jest.fn(async () => ({ ok: false, status: 400 }));
+    global.fetch = jest.fn(async () => ({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant', error_description: 'Code not valid' }) }));
     const r = await rappel({ type: 'pkce:callback', code: 'code-123' });
     expect(r.ok).toBe(false);
+    expect(r.error).toContain('invalid_grant : Code not valid');
     expect(TokenStore.storeToken).not.toHaveBeenCalled();
   });
 
