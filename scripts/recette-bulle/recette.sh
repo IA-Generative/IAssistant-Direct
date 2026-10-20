@@ -28,7 +28,6 @@ d = json.load(open(p))
 d["sites"]["sites"].append({"motif": "https://example.org/*", "cibles": [
     {"type": "assistant", "id": "sejour-des-etrangers", "titre": "Séjour des étrangers"},
     {"type": "collection", "id": "ceseda", "titre": "CESEDA", "_public": True}]})
-d["executer"]["reponse"] = "La durée dépend du titre **délivré** : voir [1].\n\n- carte temporaire : un an\n- carte pluriannuelle : jusqu'à quatre ans"
 json.dump(d, open(p, "w"), ensure_ascii=False)
 PYEOF
 
