@@ -260,6 +260,27 @@ window.MiraiAuth = {
   // Main PKCE flow
   // ──────────────────────────────────────────────
 
+  _estFirefox() {
+    const B = (typeof browser !== 'undefined') ? browser : chrome;
+    return B.runtime.getURL('').startsWith('moz-extension://');
+  },
+
+  /** Lance la connexion dans l'arrière-plan puis attend le jeton stocké (5 min au plus). */
+  async _loginParArrierePlan() {
+    const B = (typeof browser !== 'undefined') ? browser : chrome;
+    await B.runtime.sendMessage({ type: 'overlay:pkceLogin' });
+    for (let i = 0; i < 300; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const stored = await this._getStoredToken();
+      if (stored && stored.access_token && stored.expires_in > Date.now()) {
+        this._enrollInDM(stored.access_token).catch(() => {});
+        return stored.access_token;
+      }
+    }
+    console.warn('[MirAI Auth] Background login timeout (5 min).');
+    return null;
+  },
+
   /**
    * Authenticate via Keycloak PKCE + enroll in DM.
    *
@@ -293,6 +314,11 @@ window.MiraiAuth = {
         if (refreshed) return refreshed.access_token;
         console.warn('[MirAI Auth] Refresh failed, starting PKCE flow.');
       }
+
+      // Firefox : connexion confiée à l'arrière-plan (identity.launchWebAuthFlow, adresse de
+      // retour stable). Le popup se ferme dès que la fenêtre de connexion prend le focus : il
+      // ne peut pas attendre le code lui-même.
+      if (this._estFirefox()) return await this._loginParArrierePlan();
 
       // 3. Generate PKCE challenge
       const codeVerifier = this._generateCodeVerifier();

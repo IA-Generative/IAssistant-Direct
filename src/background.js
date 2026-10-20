@@ -170,6 +170,48 @@ function _pkceStockage() {
   return api.storage.session || api.storage.local;
 }
 
+// Firefox : l'adresse moz-extension://<uuid> de la page de retour change à chaque installation,
+// Keycloak ne peut pas la connaître. On passe par identity.launchWebAuthFlow, dont l'adresse
+// de retour (https://<empreinte de l'ID>.extensions.allizom.org/) est stable.
+function _estFirefox() {
+  return api.runtime.getURL('').startsWith('moz-extension://');
+}
+
+/** Échange le code PKCE contre un jeton et le stocke. Rend { ok } ou { ok: false, error }. */
+async function _pkceEchanger(attente, code) {
+  try {
+    const resp = await fetch(attente.tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: attente.clientId,
+        code,
+        redirect_uri: attente.redirectUri,
+        code_verifier: attente.verifier
+      })
+    });
+    if (!resp.ok) {
+      // Champ `error` de Keycloak (jamais de jeton dans une réponse en erreur).
+      let raison = '';
+      try { const e = await resp.json(); raison = [e.error, e.error_description].filter(Boolean).join(' : '); } catch (_) { /* corps non JSON */ }
+      console.warn('[MirAI] Token exchange refused:', resp.status, raison);
+      return { ok: false, error: `Échange du code refusé par le serveur de connexion (${resp.status}${raison ? ' — ' + raison : ''}).` };
+    }
+    const data = await resp.json();
+    await TokenStore.storeToken({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_in: Date.now() + (data.expires_in * 1000)
+    });
+    console.info('[MirAI] Token obtained via overlay PKCE login.');
+    return { ok: true };
+  } catch (e) {
+    console.error('[MirAI] Token exchange failed:', e.message);
+    return { ok: false, error: 'Échange du code impossible : ' + e.message };
+  }
+}
+
 // Store pending PKCE state
 let _pendingPkceCode = null;
 let _pendingPkceVerifier = null;
@@ -212,38 +254,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
         return;
       }
-      try {
-        const resp = await fetch(attente.tokenUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            grant_type: 'authorization_code',
-            client_id: attente.clientId,
-            code: msg.code,
-            redirect_uri: attente.redirectUri,
-            code_verifier: attente.verifier
-          })
-        });
-        if (!resp.ok) {
-          // Champ `error` de Keycloak (jamais de jeton dans une réponse en erreur).
-          let raison = '';
-          try { const e = await resp.json(); raison = [e.error, e.error_description].filter(Boolean).join(' : '); } catch (_) { /* corps non JSON */ }
-          console.warn('[MirAI] Token exchange refused:', resp.status, raison);
-          sendResponse({ ok: false, error: `Échange du code refusé par le serveur de connexion (${resp.status}${raison ? ' — ' + raison : ''}).` });
-          return;
-        }
-        const data = await resp.json();
-        await TokenStore.storeToken({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-          expires_in: Date.now() + (data.expires_in * 1000)
-        });
-        console.info('[MirAI] Token obtained via overlay PKCE login.');
-        sendResponse({ ok: true });
-      } catch (e) {
-        console.error('[MirAI] Token exchange failed:', e.message);
-        sendResponse({ ok: false, error: 'Échange du code impossible : ' + e.message });
-      }
+      sendResponse(await _pkceEchanger(attente, msg.code));
     })();
     return true;
   }
@@ -426,7 +437,8 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           authBase = `${issuerUrl}/realms/${realm}`;
         }
 
-        const callbackUrl = api.runtime.getURL('src/callback.html');
+        const firefox = _estFirefox() && !!api.identity?.launchWebAuthFlow;
+        const callbackUrl = firefox ? api.identity.getRedirectURL() : api.runtime.getURL('src/callback.html');
 
         // Generate PKCE
         const verifierBytes = new Uint8Array(32);
@@ -445,6 +457,19 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           code_challenge_method: 'S256',
           prompt: 'login'
         });
+
+        if (firefox) {
+          // Fenêtre de connexion gérée par Firefox ; le code revient ici, l'échange aussi.
+          sendResponse({ ok: true });
+          const tokenUrl = `${authBase}/protocol/openid-connect/token`;
+          let retour = null;
+          try { retour = await api.identity.launchWebAuthFlow({ url: authUrl, interactive: true }); }
+          catch (e) { console.warn('[MirAI] Firefox login cancelled or failed:', e.message); return; }
+          const code = retour ? new URL(retour).searchParams.get('code') : null;
+          if (!code) { console.warn('[MirAI] Firefox login: no code returned.'); return; }
+          await _pkceEchanger({ verifier: codeVerifier, redirectUri: callbackUrl, clientId, tokenUrl }, code);
+          return;
+        }
 
         // Store verifier for token exchange when callback arrives
         _pendingPkceVerifier = codeVerifier;
