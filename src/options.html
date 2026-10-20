@@ -54,6 +54,12 @@
     button.dm-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid #ccc;
       background: #f7f7f7; cursor: pointer; }
     button.dm-btn:disabled { opacity: .5; cursor: default; }
+
+    /* ── Section Mes collections ── */
+    #mc-section { margin-top: 22px; border-top: 1px solid #eee; padding-top: 14px; }
+    #mc-etat { border-collapse: collapse; font-size: 12px; }
+    #mc-etat td { padding: 2px 10px 2px 0; vertical-align: top; }
+    #mc-etat td:first-child { color: #555; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -94,6 +100,27 @@
       <summary>Config active (valeurs sensibles masquées)</summary>
       <div id="dm-config-body"></div>
     </details>
+  </section>
+
+  <section id="mc-section">
+    <h3>Mes collections</h3>
+    <p style="font-size:12px; color:#555; margin:0 0 8px;">
+      La bulle « + IA » apparaît sur les pages déclarées dans Mes collections.
+      Si le service ne répond pas, elle reste masquée et le plug-in réessaie seul.
+    </p>
+    <table id="mc-etat"><!-- rempli dynamiquement --></table>
+    <div class="dm-actions">
+      <button id="mc-reessayer" class="dm-btn" type="button">Réessayer maintenant</button>
+      <label for="mc-doublure" style="width:auto; font-weight:400;">Doublure (développement)</label>
+      <select id="mc-doublure">
+        <option value="">désactivée</option>
+        <option value="normal">normale</option>
+        <option value="anonyme">anonyme acceptée</option>
+        <option value="refuse">jeton refusé (403)</option>
+        <option value="limite">limitée (429)</option>
+        <option value="panne">panne</option>
+      </select>
+    </div>
   </section>
 
   <script src="crypto.js"></script>

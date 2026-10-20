@@ -17,7 +17,8 @@
     "identity",
     "activeTab",
     "alarms",
-    "notifications"
+    "notifications",
+    "scripting"
   ],
 
   "host_permissions": [
@@ -30,6 +31,9 @@
       "src/crypto.js",
       "src/dm/bootstrap.js",
       "src/recording.js",
+      "src/mescollections/correspond.js",
+      "src/mescollections/doublure.js",
+      "src/mescollections/sites.js",
       "src/background.js"
     ]
   },

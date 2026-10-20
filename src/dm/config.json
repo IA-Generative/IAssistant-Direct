@@ -24,7 +24,8 @@
     "keycloakClientId": "mirai-extension",
     "apiBase": "http://localhost:8080/api",
     "compteRenduUrl": "http://localhost:8080/",
-    "comuUrl": "https://webconf.comu.gouv.fr/"
+    "comuUrl": "https://webconf.comu.gouv.fr/",
+    "mycollectionsApiBase": "http://localhost:8200"
   },
   "int": {
     "_description": "Integration / recette (valeurs fallback ; le DM sert les vraies au runtime)",
@@ -36,7 +37,8 @@
     "keycloakClientId": "mirai-extension",
     "apiBase": "https://compte-rendu.mirai.interieur.gouv.fr/api",
     "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
-    "comuUrl": "https://webconf.comu.gouv.fr/"
+    "comuUrl": "https://webconf.comu.gouv.fr/",
+    "mycollectionsApiBase": "https://mescollections.numerique-interieur.com"
   },
   "prod": {
     "_description": "Production — liste ORDONNEE de DM (ordre = priorite : [0]=primaire, puis secours). Le bootstrap scanne et garde le premier qui repond ; CE DM sert la config runtime sous ?profile=prod. Ordre de resolution: preference utilisateur (options) > liste poussee par le DM > cette liste bakee. Valeurs ci-dessous = fallback hors-ligne si AUCUN DM ne repond.",
@@ -53,6 +55,7 @@
     "keycloakClientId": "mirai-extension",
     "apiBase": "https://compte-rendu.mirai.interieur.gouv.fr/api",
     "compteRenduUrl": "https://compte-rendu.mirai.interieur.gouv.fr/",
-    "comuUrl": "https://webconf.comu.gouv.fr/"
+    "comuUrl": "https://webconf.comu.gouv.fr/",
+    "mycollectionsApiBase": "https://mescollections.numerique-interieur.com"
   }
 }

@@ -29,6 +29,8 @@ globalThis.DMBootstrap = {
     apiBase: 'https://compte-rendu.mirai.interieur.gouv.fr/api',
     compteRenduUrl: 'https://compte-rendu.mirai.interieur.gouv.fr/',
     comuUrl: 'https://webconf.comu.gouv.fr/',
+    // Mes collections (bulle « + IA ») : bakée en attendant le DM (issue #5).
+    mycollectionsApiBase: 'https://mescollections.numerique-interieur.com',
     portal_url: 'https://mirai.interieur.gouv.fr',
     allowedKeywords: ['webconf', 'visio', 'comu', 'webinaire', 'webex', 'gmeet', 'teams'],
     telemetryEnabled: true
