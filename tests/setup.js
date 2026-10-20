@@ -23,6 +23,11 @@ const chromeMock = {
   storage: {
     local: {
       get: jest.fn((keys, cb) => {
+        if (keys === null || keys === undefined) {   // null = tout le stockage
+          const tout = { ...storageData };
+          if (cb) cb(tout);
+          return Promise.resolve(tout);
+        }
         if (typeof keys === 'string') {
           const result = {};
           result[keys] = storageData[keys] || undefined;

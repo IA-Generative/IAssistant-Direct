@@ -191,8 +191,8 @@ seul endroit où une panne est visible.
 | `src/mescollections/correspond.js` | Fonction pure `correspond(url, motif)` : match pattern → expression régulière, fragment ignoré. |
 | `src/mescollections/sites.js` | Lecture de `/sites`, cache, état (§5.1), recul exponentiel (§5.2), mode anonyme (§5.3). Sans DOM. |
 | `src/mescollections/api.js` | `executer`, `search`, avec les règles de §5.2. Sans DOM. |
-| `src/mescollections/bulle.js` | Bulle + panneau dans un Shadow DOM fermé, injecté dans les onglets qui correspondent. |
-| `src/mescollections/bulle.css` | Feuille chargée en `adoptedStyleSheets`. |
+| `src/mescollections/bulle.js` | Bulle + panneau dans un Shadow DOM fermé, injecté dans les onglets qui correspondent. Styles embarqués : `adoptedStyleSheets` sous Chrome, repli `<style>` sous Firefox (qui refuse l'affectation depuis un content script). |
+| `src/mescollections/doublure.js` | Faux serveur rendant `doublure.json` selon un mode (normal, anonyme, refuse, limite, panne). |
 | `src/mescollections/doublure.json` | Réponse fictive de `/sites` et des questions, données en `fake-domain.name`, pour développer sans serveur. |
 | `tests/mescollections-*.test.js` | `correspond` (table de cas), `sites` (états, recul, anonyme), `api` (429, 503, 404, 401). |
 
