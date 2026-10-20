@@ -217,3 +217,48 @@ describe('background.js', () => {
     });
   });
 });
+
+describe('PKCE : service worker redémarré pendant la connexion', () => {
+  const ATTENTE = { verifier: 'verif', redirectUri: 'chrome-extension://id/src/callback.html', clientId: 'mirai-extension', tokenUrl: 'https://sso.fake-domain.name/realms/mirai/protocol/openid-connect/token' };
+  const rappel = (msg) => new Promise((resolve) => {
+    const handler = chrome.runtime.onMessage.addListener.mock.calls[0][0];
+    handler(msg, {}, resolve);
+  });
+
+  beforeEach(() => {
+    global.TokenStore = { storeToken: jest.fn(async () => {}), getToken: jest.fn(async () => null) };
+  });
+
+  test('l\'état persisté sert à l\'échange du code, puis est effacé', async () => {
+    __seedChromeStorage({ pkceEnAttente: { ...ATTENTE, t: Date.now() } });
+    loadBackground();   // variables en mémoire vides, comme après un redémarrage
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ access_token: 'a', refresh_token: 'r', expires_in: 300 }) }));
+    const r = await rappel({ type: 'pkce:callback', code: 'code-123' });
+    expect(r).toEqual({ ok: true });
+    const corps = global.fetch.mock.calls[0][1].body;
+    expect(global.fetch.mock.calls[0][0]).toBe(ATTENTE.tokenUrl);
+    expect(corps.get('code_verifier')).toBe('verif');
+    expect(corps.get('code')).toBe('code-123');
+    expect(TokenStore.storeToken).toHaveBeenCalled();
+    expect(__getChromeStorage().pkceEnAttente).toBeUndefined();
+  });
+
+  test('échange refusé : l\'échec est rendu à la page de retour', async () => {
+    __seedChromeStorage({ pkceEnAttente: { ...ATTENTE, t: Date.now() } });
+    loadBackground();
+    global.fetch = jest.fn(async () => ({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant', error_description: 'Code not valid' }) }));
+    const r = await rappel({ type: 'pkce:callback', code: 'code-123' });
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('invalid_grant : Code not valid');
+    expect(TokenStore.storeToken).not.toHaveBeenCalled();
+  });
+
+  test('état trop ancien ou absent : code gardé pour le popup (pkce:getCode)', async () => {
+    __seedChromeStorage({ pkceEnAttente: { ...ATTENTE, t: Date.now() - 11 * 60 * 1000 } });
+    loadBackground();
+    global.fetch = jest.fn();
+    expect(await rappel({ type: 'pkce:callback', code: 'code-123' })).toEqual({ ok: true });
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(await rappel({ type: 'pkce:getCode' })).toEqual(expect.objectContaining({ code: 'code-123' }));
+  });
+});
