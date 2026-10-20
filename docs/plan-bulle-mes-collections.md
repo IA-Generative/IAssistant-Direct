@@ -51,7 +51,8 @@ après la capture de réunions.
 ## 4. Contrat avec Mes collections
 
 Contrat convenu avec l'équipe Mes collections ; il est la référence côté serveur
-(`docs/clients.md` de Mes collections). Aucun champ n'est inventé ici.
+(`docs/clients.md` de Mes collections, section « Sites déclarés », PR
+IA-Generative/mycollections#98). Aucun champ n'est inventé ici.
 
 ### 4.1 Sites déclarés
 
@@ -60,18 +61,25 @@ GET {mycollectionsApiBase}/api/v1/sites
 Authorization: Bearer <access token de la personne>     (absent en mode anonyme, §5.3)
 
 200 { "ttl_s": 3600,
+      "anonyme": false,
       "sites": [ { "motif": "https://www.legifrance.gouv.fr/codes/*",
                    "cibles": [ { "type": "assistant",  "id": "…", "titre": "…" },
                                { "type": "collection", "id": "…", "titre": "…" } ] } ] }
 ```
 
-- Seules les cibles que la personne **lit** sont rendues.
+- Seules les cibles que la personne **lit** sont rendues. Un assistant jamais publié
+  n'apparaît que pour qui le gère ; aucun assistant si le drapeau assistants est
+  éteint côté serveur.
 - Lue au démarrage, toutes les `ttl_s` secondes (une heure par défaut) et à chaque
   connexion.
 - **Motifs** : règle exacte des *match patterns* d'extension. Schéma `https` exact,
-  hôte explicite avec un éventuel `*.` en tête, chemin comparé **avec la query**,
-  `#fragment` jamais comparé. `*` seul et `<all_urls>` refusés côté serveur ; vingt
-  motifs au plus par fiche.
+  hôte explicite en minuscules, `*.` en tête possible sur au moins deux niveaux
+  (`*.gouv.fr` oui, `*.fr` non), ni port ni identifiant ; chemin comparé **avec la
+  query**, `#fragment` jamais comparé. `*` seul et `<all_urls>` refusés côté serveur ;
+  vingt motifs au plus par fiche. L'extension applique la même règle et ignore un
+  motif qui ne la respecte pas.
+- **Erreurs** : 401 sans jeton valide ; 403 au format
+  `{"detail": {"code": "audience_mismatch", "message": "…"}}`.
 
 ### 4.2 Poser une question
 
@@ -83,6 +91,9 @@ Authorization: Bearer <access token de la personne>     (absent en mode anonyme,
 
 Rendu : `reponse` présente ⇒ l'afficher avec ses citations ; sinon les passages
 trouvés, cités et cliquables. Recherche citée, pas conversation inventée.
+
+Ces deux routes ne sont **jamais anonymes** (401 sans jeton). Leurs erreurs suivent
+le format `{"error": {"code": "…", "message": "…"}}`.
 
 ### 4.3 Liens signés
 
@@ -107,13 +118,15 @@ L'arrière-plan tient un état unique, `mescollectionsEtat`, dans `storage.local
 
 | État | Signification | Bulle |
 |---|---|---|
-| `inactif` | Pas d'URL configurée, ou fonction coupée | Jamais |
-| `connecte` | `/sites` a répondu avec le jeton de la personne | Sur les pages qui correspondent |
-| `anonyme` | `/sites` a répondu sans jeton (§5.3) | Sur les pages qui correspondent, marquée « mode anonyme » |
+| `inactif` | Pas d'URL configurée, fonction coupée, ou anonyme refusé (§5.3) | Jamais |
+| `refuse` | 403 `audience_mismatch` : le jeton existe mais Mes collections ne l'accepte pas | Jamais — diagnostic « jeton non accepté par Mes collections » |
+| `connecte` | `/sites` a répondu avec le jeton de la personne (`anonyme: false`) | Sur les pages qui correspondent |
+| `anonyme` | `/sites` a répondu sans jeton (`anonyme: true`, §5.3) | Sur les pages qui correspondent, marquée « mode anonyme », sans question possible |
 | `injoignable` | Pas de réponse, délai dépassé, 5xx, ou 429 persistant | **Jamais** — inerte, nouvelle tentative programmée |
 
-Champs associés : `derniereReponse` (horodatage), `echecs` (compteur),
-`prochaineTentative` (horodatage), `motifs` (dernière liste valide), `ttl_s`.
+Champs associés : `raison` (texte court pour le diagnostic), `derniereReponse`
+(horodatage), `echecs` (compteur), `prochaineTentative` (horodatage), `motifs`
+(dernière liste valide), `ttl_s`.
 
 ### 5.2 Retry
 
@@ -142,21 +155,26 @@ Champs associés : `derniereReponse` (horodatage), `echecs` (compteur),
 
 ### 5.3 Mode anonyme
 
-Si Mes collections **répond** mais que le jeton n'est pas actif, l'extension
-recommence **sans en-tête `Authorization`**. Ce mode sert notamment au débogage.
+Si Mes collections **répond** mais que le jeton n'est pas actif, l'extension relit
+`/sites` **sans en-tête `Authorization`**. Ce mode sert au débogage.
 
 - **Déclencheurs** : pas de jeton stocké ; rafraîchissement par le `refresh_token`
-  en échec ; 401 persistant après un rafraîchissement forcé et une nouvelle tentative ;
-  403 `audience_mismatch` (le jeton existe mais n'est pas accepté).
-- Réponse 200 sans jeton ⇒ état `anonyme`, bulle marquée « mode anonyme ». Les
-  questions partent aussi sans jeton.
-- Réponse 401 sans jeton ⇒ Mes collections n'accepte pas l'anonyme : état `inactif`
-  jusqu'à la prochaine connexion. Pas de nouvelle tentative en boucle.
+  en échec ; 401 persistant après un rafraîchissement forcé et une nouvelle tentative.
+- **Pas de bascule sur 403 `audience_mismatch`** : le jeton est actif mais refusé,
+  c'est une erreur de configuration à rendre visible, pas à masquer. État `refuse`
+  et diagnostic.
+- **Côté serveur** : `/sites` sans jeton rend 401 par défaut. Avec
+  `MYCOLLECTIONS_SITES_ANONYMES=true` (débogage, coupé en production), il rend 200
+  avec `anonyme: true`, les seules collections ouvertes à tous (non archivées) et
+  aucun assistant.
+- Réponse 200 sans jeton ⇒ état `anonyme`. La bulle s'affiche, le panneau montre
+  les cibles et dit « Connectez-vous pour poser une question » avec un bouton de
+  connexion. **Aucun appel de question n'est tenté** : `search` et `executer` ne
+  sont jamais anonymes.
+- Réponse 401 sans jeton ⇒ état `inactif` jusqu'à la prochaine connexion. Pas de
+  nouvelle tentative en boucle.
 - Le retour au mode connecté se fait à la connexion suivante, ou au prochain cycle
   si un jeton valide réapparaît.
-- **Côté Mes collections** : ce que l'appel anonyme rend (rien, ou les seules
-  collections publiques) est leur décision. Le besoin d'un mode anonyme pour le
-  débogage leur a été transmis.
 
 ### 5.4 Diagnostic
 
@@ -193,7 +211,13 @@ seul endroit où une panne est visible.
 ### 6.3 Configuration
 
 - `mycollectionsApiBase` est **bakée** dans `src/dm/config.json` et dans
-  `_fallbackConfig`. Vide ⇒ état `inactif`.
+  `_fallbackConfig`. Vide ⇒ état `inactif`. Valeurs en attendant le DM (il n'existe
+  qu'une instance déployée) :
+
+  | Profil | Valeur |
+  |---|---|
+  | `dev` | `http://localhost:8200` (backend local) |
+  | `int`, `prod` | `https://mescollections.numerique-interieur.com` |
 - **TODO** : la faire servir par le Device Management (placeholder
   `${{MYCOLLECTIONS_API_BASE}}` dans `src/dm/dm-config.json`, variable d'environnement
   côté DM, liste des variables dans `docs/adr-plugin-dm-integration.md`). Suivi
@@ -295,11 +319,16 @@ Une PR en brouillon par phase, sans fusion.
 - Thèmes clair et sombre ; Marianne avec repli système ; `role="dialog"`, Échap
   réduit, focus rendu à la bulle, `aria-live` sur le fil.
 
-## 11. Questions ouvertes
+## 11. Questions
+
+Ouverte :
 
 1. Ordre de fusion avec la PR #3 (§8).
-2. Ce que Mes collections rend en anonyme (§5.3).
-3. 403 `audience_mismatch` : basculer en anonyme (choix de ce plan) ou rester
-   `inactif` avec un diagnostic ?
-4. Valeur bakée de `mycollectionsApiBase` pour les profils `prod` et `int` en
-   attendant le DM.
+
+Tranchées avec Mes collections :
+
+2. Réponse anonyme : liste seule, collections publiques, derrière un interrupteur
+   serveur ; questions jamais anonymes (§5.3).
+3. 403 `audience_mismatch` : état `refuse` avec diagnostic, pas de bascule anonyme
+   (§5.1).
+4. Valeurs bakées de `mycollectionsApiBase` : §6.3.
