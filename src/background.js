@@ -650,12 +650,20 @@ if (_mcDisponible()) {
     return true;
   });
 
-  // Page d'options : diagnostic et « Réessayer maintenant ». Réservé aux pages de l'extension.
+  // Pages de l'extension (options, popup) : diagnostic, « Mettre à jour la liste », cibles de
+  // l'onglet actif. Réservé aux pages de l'extension.
   api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (msg?.type !== 'mescollections:etat' && msg?.type !== 'mescollections:reessayer') return;
+    const types = ['mescollections:etat', 'mescollections:reessayer', 'mescollections:page'];
+    if (!types.includes(msg?.type)) return;
     if (!sender?.url || !sender.url.startsWith(api.runtime.getURL(''))) return;
     (async () => {
       try {
+        if (msg.type === 'mescollections:page') {
+          // Popup : cibles de l'onglet actif, comparées ici comme pour la bulle.
+          const { cibles } = await MesCollectionsSites.ciblesPour(String(msg.url || ''));
+          sendResponse({ ok: true, cibles, etat: await MesCollectionsSites.etat() });
+          return;
+        }
         const etat = msg.type === 'mescollections:reessayer'
           ? await MesCollectionsSites.reinitialiser()
           : await MesCollectionsSites.etat();

@@ -194,8 +194,18 @@ Si Mes collections **répond** mais que le jeton n'est pas actif, l'extension re
 ### 5.4 Diagnostic
 
 La page d'options affiche une ligne « Mes collections » : état, dernière réponse,
-nombre d'échecs, prochaine tentative, et un bouton « Réessayer maintenant ». C'est le
-seul endroit où une panne est visible.
+nombre d'échecs, prochaine tentative, et un bouton « Mettre à jour la liste ». Le popup
+rappelle l'état et l'heure de la liste sur une ligne, avec le même bouton. Aucune panne
+n'est signalée sur la page visitée.
+
+### 5.5 Popup
+
+Sur une page déclarée qui n'est pas une visio, le popup masque les informations de
+conférence (bouton REC, onglets visio, dernières conférences, raccourcis, overlay) et
+montre à la place les sources de la page, la case « Afficher la bulle sur ce site » et
+l'opacité de la bulle au repos (10 à 100 %, 35 % par défaut). Les réglages sont rangés
+avec ceux de la bulle (`mescollectionsBulle` : `masques`, `opacite`) et appliqués à la
+bulle sans recharger la page.
 
 ## 6. Architecture dans l'extension
 
