@@ -4,8 +4,9 @@
 // Règles (docs/plan-bulle-mes-collections.md §5.2) :
 //   - délai 30 s par requête ;
 //   - 401 : rafraîchissement forcé du jeton, une nouvelle tentative, puis « reconnectez-vous » ;
-//   - 429 : Retry-After respecté s'il est inférieur à 30 s, sinon (absent) une tentative après 2 s ;
-//   - 503 ou réseau : une tentative après 2 s, puis « réessayez dans un instant » (panne signalée) ;
+//   - 429 et 5xx : une nouvelle tentative, après Retry-After s'il est présent et ≤ 30 s,
+//     sinon après 2 s ; Retry-After > 30 s : message immédiat ; 5xx persistant = panne signalée ;
+//   - réseau : une tentative après 2 s, puis « réessayez dans un instant » (panne signalée) ;
 //   - 404 : la cible n'est plus lisible, elle est à retirer ;
 //   - 403 audience_mismatch : message de configuration.
 
@@ -81,18 +82,16 @@
           : erreur(code, 'Accès refusé par Mes collections.');
       }
       if (rep.status === 404) return erreur('introuvable', 'Cette source n\'est plus accessible.', { retirer: true });
-      if (rep.status === 429) {
+      if (rep.status === 429 || rep.status >= 500) {
         const ra = Number(rep.headers && rep.headers.get('retry-after'));
         if (!reessaye && (!ra || ra <= RETRY_AFTER_MAX_S)) {
           reessaye = true;
           await deps.attendre(ra ? ra * 1000 : ATTENTE_MS);
           continue;
         }
-        return erreur('limite', 'Trop de questions d\'affilée. Réessayez dans un instant.');
-      }
-      if (rep.status >= 500) {
-        if (!reessaye) { reessaye = true; await deps.attendre(ATTENTE_MS); continue; }
-        return erreur('indisponible', 'Mes collections est indisponible. Réessayez dans un instant.', { panne: true });
+        return rep.status === 429
+          ? erreur('limite', 'Trop de questions d\'affilée. Réessayez dans un instant.')
+          : erreur('indisponible', 'Mes collections est indisponible. Réessayez dans un instant.', { panne: true });
       }
       return erreur('inattendu', `Réponse inattendue de Mes collections (${rep.status}).`);
     }
@@ -111,7 +110,9 @@
     const titre = texte(p.titre, MAX_TITRE);
     const extrait = texte(p[champTexte], MAX_TEXTE);
     if (!titre && !extrait) return null;
-    return { titre, texte: extrait, url: https(p.url), source: texte(p.source || p.collection, MAX_TITRE) };
+    const propre = { titre, texte: extrait, url: https(p.url), source: texte(p.source || p.collection, MAX_TITRE) };
+    if (Number.isInteger(p.etape) && p.etape > 0) propre.etape = p.etape;   // étape du plan (executer)
+    return propre;
   }
 
   async function executer(cfg, cible, question) {

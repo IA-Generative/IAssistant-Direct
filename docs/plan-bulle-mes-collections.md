@@ -89,11 +89,24 @@ Authorization: Bearer <access token de la personne>     (absent en mode anonyme,
 - **Collections** : `GET /api/v1/search?q=…&scope=a,b&limit=8` → `results[]` (titre,
   extrait, url signée, collection).
 
-Rendu : `reponse` présente ⇒ l'afficher avec ses citations ; sinon les passages
-trouvés, cités et cliquables. Recherche citée, pas conversation inventée.
+Rendu : les passages trouvés, cités et cliquables (les passages d'`executer` portent un
+lien signé et leur numéro d'`etape`). `reponse` vaut aujourd'hui toujours `null` : si elle
+arrive, elle est affichée en texte simple, sans interpréter de convention de citation
+(aucune n'est fixée). Recherche citée, pas conversation inventée.
 
-Ces deux routes ne sont **jamais anonymes** (401 sans jeton). Leurs erreurs suivent
-le format `{"error": {"code": "…", "message": "…"}}`.
+`plan` a une forme fixe (`Plan` de Mes collections) : `assistant`, `version`,
+`planificateur`, `consigne`, `score_consigne`, `reponse_fiable`,
+`etapes[] {n, source, question, poids, attend[], avec}`, `sources_ignorees` (un compte),
+`a_valider`. Rendu : « Consigne retenue : … (ressemblance N %) », une ligne par étape
+« Étape n : <source> — k passage(s) » (avec « après les étapes … » si `attend`), et
+« N source(s) non interrogée(s) » sans jamais les nommer.
+
+Limites : `executer` et `plan`, 30 questions par personne et par minute (429 +
+`Retry-After`) ; un 503 « moteur en panne » porte `Retry-After: 10`.
+
+Ces deux routes ne sont **jamais anonymes** (401 sans jeton). Erreurs : `search` au
+format `{"error": {"code": "…", "message": "…"}}`, `executer` au format FastAPI
+`{"detail": "<chaîne>"}`.
 
 ### 4.3 Liens signés
 
@@ -146,10 +159,10 @@ Champs associés : `raison` (texte court pour le diagnostic), `derniereReponse`
 **Questions (`executer`, `search`)** :
 
 - Délai par requête : 30 s.
-- 429 : respecter `Retry-After` s'il est présent et inférieur à 30 s, sinon une
-  seule nouvelle tentative après 2 s, puis message « réessayez dans un instant ».
-- 503 ou erreur réseau : une seule nouvelle tentative après 2 s, puis le même
-  message. Deux échecs de suite ⇒ l'arrière-plan relance immédiatement la lecture de
+- 429 et 5xx : une seule nouvelle tentative, après `Retry-After` s'il est présent et
+  inférieur ou égal à 30 s, sinon après 2 s ; `Retry-After` au-delà de 30 s : message
+  immédiat « réessayez dans un instant ».
+- Erreur réseau : une seule nouvelle tentative après 2 s, puis le même message. Deux échecs de suite ⇒ l'arrière-plan relance immédiatement la lecture de
   `/sites` ; si elle échoue aussi, état `injoignable` et la bulle disparaît.
 - 404 : la cible n'est plus lisible, elle est retirée des puces.
 
