@@ -4,7 +4,7 @@
 // par le DOM, le texte reçu ne devient jamais du balisage. Ne lit ni le contenu ni
 // l'adresse de la page, sauf geste explicite (« Utiliser la sélection »).
 // Mécanique du panneau reprise de la fenêtre DGEF (IA-Generative/dgef-eligibilite,
-// demo/intranet/fenetre.js) : poignée, bornes, setPointerCapture, clavier, rendu Markdown.
+// demo/intranet/fenetre.js) : poignée, bornes, setPointerCapture, clavier.
 
 (function () {
   if (globalThis.__mesCollectionsBulle) return;   // une seule instance par document
@@ -87,19 +87,15 @@
     .msg a { color: var(--bleu); }
     .msg.moi a { color: #fff; }
     .msg .etiquette { font-size: 12px; font-weight: 700; color: var(--texte-2); }
-    .msg .titre { font-weight: 700; font-size: 14.5px; }
-    .msg ul, .msg ol { padding-left: 20px; }
-    .msg code { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; background: var(--bord); padding: 0 3px; border-radius: 3px; }
-    .msg blockquote { border-left: 3px solid var(--bord); padding-left: 10px; margin-left: 0; color: var(--texte-2); }
-    .msg .cit { font-size: 11px; vertical-align: super; text-decoration: none; }
+    .msg ul { padding-left: 20px; }
+    .msg .reponse { white-space: pre-wrap; }
     .carte { background: var(--fond); border: 1px solid var(--bord); border-radius: 6px; padding: 7px 9px; }
     .carte strong { display: block; font-size: 13px; }
     .carte p { margin: 3px 0; font-size: 12.5px; color: var(--texte-2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
     .carte .pied { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--texte-2); }
     .carte a { font-weight: 700; }
     details.plan summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--bleu); }
-    details.plan ul, details.plan dl { font-size: 12.5px; margin: 4px 0 0; }
-    details.plan dt { font-weight: 700; } details.plan dd { margin: 0 0 4px 10px; }
+    details.plan ul, details.plan p { font-size: 12.5px; margin: 4px 0 0; }
     .attente { align-self: flex-start; color: var(--texte-2); font-style: italic; }
     .bouton-lien { background: none; border: 0; padding: 0; color: var(--bleu); text-decoration: underline; cursor: pointer; }
 
@@ -122,7 +118,7 @@
     if (texte !== undefined) e.textContent = texte;
     return e;
   };
-  const lien = (href, texte, className) => el('a', { href, target: '_blank', rel: 'noopener noreferrer', className: className || '' }, texte);
+  const lien = (href, texte) => el('a', { href, target: '_blank', rel: 'noopener noreferrer' }, texte);
   const estHttps = (u) => typeof u === 'string' && /^https:\/\//i.test(u);
   const envoyerMessage = (msg) => new Promise((resolve) => {
     try {
@@ -416,101 +412,36 @@
     rendreCibles();
   }
 
-  // ── Fil : rendu Markdown sans innerHTML ──────────────────────────────
-  // Repris de la fenêtre DGEF : titres, gras, italique, code, listes, citations, liens https ;
-  // « [n] » devient un appel de note vers le passage n quand il a une adresse https.
-  function enLigne(parent, texte, passages) {
-    const motif = /(`[^`]+`)|(\*\*[^*]+?\*\*)|(\*[^*\s][^*]*?\*)|\[([^\]]+)\]\((https:\/\/[^\s)]+)\)|(https:\/\/[^\s)\]<>]+)|\[(\d+)\]/g;
-    let fin = 0, m;
-    while ((m = motif.exec(texte))) {
-      if (m.index > fin) parent.append(texte.slice(fin, m.index));
-      fin = motif.lastIndex;
-      if (m[1]) parent.append(el('code', {}, m[1].slice(1, -1)));
-      else if (m[2]) { const b = el('strong'); enLigne(b, m[2].slice(2, -2), passages); parent.append(b); }
-      else if (m[3]) { const i = el('em'); enLigne(i, m[3].slice(1, -1), passages); parent.append(i); }
-      else if (m[5]) parent.append(lien(m[5], m[4]));
-      else if (m[6]) {
-        const url = m[6].replace(/[.,;:!?]+$/, '');
-        parent.append(lien(url, url));
-        fin -= m[6].length - url.length;
-        motif.lastIndex = fin;
-      } else if (m[7]) {
-        const p = passages && passages[Number(m[7]) - 1];
-        if (p && estHttps(p.url)) { const a = lien(p.url, `[${m[7]}]`, 'cit'); a.title = p.titre || ''; parent.append(a); }
-        else parent.append(m[0]);
-      }
-    }
-    if (fin < texte.length) parent.append(texte.slice(fin));
+  // ── Fil ──────────────────────────────────────────────────────────────
+  // Le plan d'un assistant (forme fixe du contrat, `Plan` de Mes collections) : consigne
+  // retenue, une ligne par étape, nombre de sources non interrogées (jamais leurs noms).
+  // Une autre forme est montrée telle quelle, en texte.
+  function titreSource(id, passages, n) {
+    const c = cibles.find((x) => x.type === 'collection' && x.id === id);
+    if (c) return c.titre;
+    const p = passages.find((x) => x.etape === n && x.titre);
+    return p ? p.titre : String(id || 'source');
   }
 
-  const RE_LISTE = /^\s*([-*+]|\d+[.)])\s+(.*)$/, RE_TITRE = /^(#{1,6})\s+(.*?)\s*#*$/;
-  function markdown(bloc, brut, passages) {
-    const lignes = String(brut).replace(/\r/g, '').split('\n');
-    const debut = (i) => !lignes[i].trim() || RE_TITRE.test(lignes[i]) || RE_LISTE.test(lignes[i]) || /^\s*>/.test(lignes[i]);
-    let i = 0;
-    while (i < lignes.length) {
-      const ligne = lignes[i];
-      if (!ligne.trim()) { i++; continue; }
-      const titre = ligne.match(RE_TITRE);
-      if (titre) { const t = el('p', { className: 'titre' }); enLigne(t, titre[2], passages); bloc.append(t); i++; continue; }
-      if (RE_LISTE.test(ligne)) {
-        const liste = el(/^\s*\d/.test(ligne) ? 'ol' : 'ul');
-        while (i < lignes.length && RE_LISTE.test(lignes[i])) {
-          const li = el('li');
-          enLigne(li, lignes[i].match(RE_LISTE)[2], passages);
-          liste.append(li);
-          i++;
-        }
-        bloc.append(liste);
-        continue;
-      }
-      if (/^\s*>/.test(ligne)) {
-        const contenu = [];
-        while (i < lignes.length && /^\s*>/.test(lignes[i])) contenu.push(lignes[i++].replace(/^\s*>\s?/, ''));
-        const q = el('blockquote');
-        enLigne(q, contenu.join(' '), passages);
-        bloc.append(q);
-        continue;
-      }
-      const p = el('p');
-      let premier = true;
-      while (i < lignes.length && (premier || !debut(i))) {
-        if (!premier) p.append(el('br'));
-        enLigne(p, lignes[i++].trim(), passages);
-        premier = false;
-      }
-      bloc.append(p);
-    }
-  }
-
-  // Le plan d'un assistant : rendu générique (texte, liste, ou paires clé/valeur).
-  function rendrePlan(parent, plan) {
-    if (plan === null || plan === undefined) return;
-    if (typeof plan === 'string') { parent.append(el('p', {}, plan)); return; }
-    if (Array.isArray(plan)) {
-      const ul = el('ul');
-      for (const x of plan) {
-        const li = el('li');
-        if (x && typeof x === 'object') rendrePlan(li, x);
-        else li.textContent = String(x);
-        ul.append(li);
-      }
-      parent.append(ul);
+  function rendrePlan(parent, plan, passages) {
+    if (!plan || typeof plan !== 'object' || !Array.isArray(plan.etapes)) {
+      parent.append(el('p', {}, typeof plan === 'string' ? plan : JSON.stringify(plan)));
       return;
     }
-    if (typeof plan === 'object') {
-      const dl = el('dl');
-      for (const [k, v] of Object.entries(plan)) {
-        dl.append(el('dt', {}, k));
-        const dd = el('dd');
-        if (v && typeof v === 'object') rendrePlan(dd, v);
-        else dd.textContent = String(v);
-        dl.append(dd);
-      }
-      parent.append(dl);
-      return;
+    if (plan.consigne) {
+      const score = typeof plan.score_consigne === 'number' ? ` (ressemblance ${Math.round(plan.score_consigne * 100)} %)` : '';
+      parent.append(el('p', {}, `Consigne retenue : ${plan.consigne}${score}`));
     }
-    parent.append(el('p', {}, String(plan)));
+    const ul = el('ul');
+    for (const e of plan.etapes) {
+      const k = passages.filter((p) => p.etape === e.n).length;
+      let ligne = `Étape ${e.n} : ${titreSource(e.source, passages, e.n)} — ${k} passage${k > 1 ? 's' : ''}`;
+      if (Array.isArray(e.attend) && e.attend.length) ligne += ` — après les étapes ${e.attend.join(', ')} (à partir de ce qu'elles ont trouvé)`;
+      ul.append(el('li', {}, ligne));
+    }
+    parent.append(ul);
+    const ignorees = Number(plan.sources_ignorees) || 0;
+    if (ignorees > 0) parent.append(el('p', {}, `${ignorees} source${ignorees > 1 ? 's' : ''} non interrogée${ignorees > 1 ? 's' : ''}`));
   }
 
   function carte(p) {
@@ -533,11 +464,8 @@
       return m;
     }
     const passages = bloc.passages || [];
-    if (bloc.reponse) {
-      const r = el('div');
-      markdown(r, bloc.reponse, passages);
-      m.append(r);
-    }
+    // Réponse rédigée : texte simple, sans interprétation (aucune convention de citation fixée).
+    if (bloc.reponse) m.append(el('p', { className: 'reponse' }, bloc.reponse));
     if (passages.length) {
       if (bloc.reponse) m.append(el('div', { className: 'etiquette' }, 'Sources'));
       passages.forEach((p) => m.append(carte(p)));
@@ -549,7 +477,7 @@
     if (bloc.plan) {
       const d = el('details', { className: 'plan' });
       d.append(el('summary', {}, 'Comment l\'assistant a cherché'));
-      rendrePlan(d, bloc.plan);
+      rendrePlan(d, bloc.plan, passages);
       m.append(d);
     }
     return m;

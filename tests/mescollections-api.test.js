@@ -26,6 +26,7 @@ describe('appels', () => {
       reponse: 'Voir [1].',
       plan: ['étape'],
       passages: [{ titre: 'Art. 1', texte: 'Texte', url: 'https://mescollections.fake-domain.name/e/1?sig=x', source: 'ceseda' },
+        { titre: 'Art. 2', texte: 'Texte', url: null, source: 'ceseda', etape: 2 },
         { titre: 'Piège', texte: 'x', url: 'javascript:alert(1)' }]
     }));
     const { blocs } = await Api.demander(CFG, [ASSISTANT], '  Quelle durée ?  ');
@@ -37,7 +38,9 @@ describe('appels', () => {
     expect(init.credentials).toBe('omit');
     expect(blocs[0].reponse).toBe('Voir [1].');
     expect(blocs[0].plan).toEqual(['étape']);
-    expect(blocs[0].passages[1].url).toBeNull();   // seuls les liens https sont gardés
+    expect(blocs[0].passages[2].url).toBeNull();   // seuls les liens https sont gardés
+    expect(blocs[0].passages[0].etape).toBeUndefined();
+    expect(blocs[0].passages[1].etape).toBe(2);         // étape du plan conservée
   });
 
   test('collections : une seule recherche, scope = toutes les collections cochées', async () => {
@@ -93,6 +96,19 @@ describe('erreurs et retry', () => {
     expect(fetchMc).toHaveBeenCalledTimes(2);
     expect(attendre).toHaveBeenCalledWith(2000);
     expect(blocs[0].erreur).toMatchObject({ code: 'indisponible', panne: true });
+  });
+
+  test('503 avec Retry-After: 10 (moteur en panne) : attente respectée', async () => {
+    fetchMc.mockResolvedValueOnce(reponse(503, { detail: 'moteur en panne' }, { 'retry-after': '10' })).mockResolvedValueOnce(reponse(200, { passages: [] }));
+    const { blocs } = await Api.demander(CFG, [ASSISTANT], 'q');
+    expect(attendre).toHaveBeenCalledWith(10000);
+    expect(blocs[0].erreur).toBeUndefined();
+  });
+
+  test('403 au format FastAPI {detail: chaîne} : accès refusé générique', async () => {
+    fetchMc.mockResolvedValueOnce(reponse(403, { detail: 'Interdit' }));
+    const { blocs } = await Api.demander(CFG, [ASSISTANT], 'q');
+    expect(blocs[0].erreur.code).toBe('forbidden');
   });
 
   test('erreur réseau puis succès', async () => {
