@@ -34,6 +34,28 @@ describe('manifest.json', () => {
   test('background est un service worker', () => {
     expect(manifest.background.service_worker).toBe('src/background.js');
   });
+
+  test('background.scripts (Firefox ESR) : fichiers existants, background.js en dernier', () => {
+    const scripts = manifest.background.scripts;
+    expect(Array.isArray(scripts)).toBe(true);
+    expect(scripts[scripts.length - 1]).toBe('src/background.js');
+    for (const f of scripts) {
+      expect(fs.existsSync(path.join(__dirname, '..', f))).toBe(true);
+    }
+  });
+
+  test('background.scripts couvre les modules importés par le service worker', () => {
+    const bg = readSrc('background.js');
+    const importes = [...bg.matchAll(/importScripts\('([^']+)'\)/g)].map((m) => 'src/' + m[1]);
+    expect(importes.length).toBeGreaterThan(0);
+    for (const f of importes) {
+      expect(manifest.background.scripts).toContain(f);
+    }
+  });
+
+  test('importScripts est garde (absent sous Firefox)', () => {
+    expect(readSrc('background.js')).toMatch(/typeof importScripts === 'function'/);
+  });
 });
 
 describe('dm/config.json', () => {
