@@ -262,3 +262,49 @@ describe('PKCE : service worker redémarré pendant la connexion', () => {
     expect(await rappel({ type: 'pkce:getCode' })).toEqual(expect.objectContaining({ code: 'code-123' }));
   });
 });
+
+describe('Firefox : connexion par identity.launchWebAuthFlow', () => {
+  const REDIRECT = 'https://empreinte.extensions.allizom.org/';
+  const rappel = (msg) => new Promise((resolve) => {
+    const handler = chrome.runtime.onMessage.addListener.mock.calls[0][0];
+    handler(msg, {}, resolve);
+  });
+
+  beforeEach(() => {
+    global.TokenStore = { storeToken: jest.fn(async () => {}), getToken: jest.fn(async () => null) };
+    global.DMBootstrap = { init: jest.fn(async () => ({ keycloakIssuerUrl: 'https://sso.fake-domain.name', keycloakRealm: 'mirai', keycloakClientId: '' })) };
+    chrome.runtime.getURL = jest.fn((p) => `moz-extension://uuid-aleatoire/${p || ''}`);
+    chrome.identity.getRedirectURL = jest.fn(() => REDIRECT);
+    chrome.identity.launchWebAuthFlow = jest.fn(async () => REDIRECT + '?state=x&code=code-ff');
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ access_token: 'a', refresh_token: 'r', expires_in: 300 }) }));
+  });
+
+  afterEach(() => {
+    chrome.runtime.getURL = jest.fn((path) => `chrome-extension://mock-extension-id/${path || ''}`);
+  });
+
+  test('adresse de retour stable, client mirai-extension, échange et stockage du jeton', async () => {
+    loadBackground();
+    expect(await rappel({ type: 'overlay:pkceLogin' })).toEqual({ ok: true });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    const url = new URL(chrome.identity.launchWebAuthFlow.mock.calls[0][0].url);
+    expect(chrome.identity.launchWebAuthFlow.mock.calls[0][0].interactive).toBe(true);
+    expect(url.searchParams.get('redirect_uri')).toBe(REDIRECT);
+    expect(url.searchParams.get('client_id')).toBe('mirai-extension');
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
+    const corps = global.fetch.mock.calls[0][1].body;
+    expect(global.fetch.mock.calls[0][0]).toBe('https://sso.fake-domain.name/realms/mirai/protocol/openid-connect/token');
+    expect(corps.get('code')).toBe('code-ff');
+    expect(corps.get('redirect_uri')).toBe(REDIRECT);
+    expect(TokenStore.storeToken).toHaveBeenCalled();
+  });
+
+  test('connexion annulée : aucun échange', async () => {
+    chrome.identity.launchWebAuthFlow = jest.fn(async () => { throw new Error('User cancelled or denied access.'); });
+    loadBackground();
+    await rappel({ type: 'overlay:pkceLogin' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
