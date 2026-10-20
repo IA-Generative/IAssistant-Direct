@@ -44,7 +44,11 @@ describe('appels', () => {
   });
 
   test('collections : une seule recherche, scope = toutes les collections cochées', async () => {
-    fetchMc.mockResolvedValueOnce(reponse(200, { results: [{ titre: 'T', extrait: 'E', url: 'https://x.fake-domain.name/1', collection: 'ceseda' }] }));
+    fetchMc.mockResolvedValueOnce(reponse(200, { source: 'mycollections', total: 1, results: [{
+      id: 'ceseda:1', title: 'T', date: null, url: 'https://x.fake-domain.name/1', score: 0.8,
+      hits: [{ snippet: 'E', highlights: [], field: 'content', url: 'https://x.fake-domain.name/1' }, { snippet: 'F' }],
+      context: { collection: { id: 'ceseda', title: 'CESEDA' }, right: 'lecture' }
+    }] }));
     const { blocs } = await Api.demander(CFG, [C1, C2], 'titre de séjour');
     expect(fetchMc).toHaveBeenCalledTimes(1);
     const url = new URL(fetchMc.mock.calls[0][0]);
@@ -52,7 +56,7 @@ describe('appels', () => {
     expect(url.searchParams.get('q')).toBe('titre de séjour');
     expect(url.searchParams.get('scope')).toBe('ceseda,crpa');
     expect(url.searchParams.get('limit')).toBe('8');
-    expect(blocs[0]).toMatchObject({ type: 'collections', passages: [{ titre: 'T', texte: 'E', source: 'ceseda' }] });
+    expect(blocs[0]).toMatchObject({ type: 'collections', passages: [{ titre: 'T', texte: 'E … F', url: 'https://x.fake-domain.name/1', source: 'CESEDA' }] });
   });
 
   test('assistant + collections : un bloc par appel', async () => {

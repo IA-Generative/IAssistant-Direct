@@ -86,8 +86,10 @@ Authorization: Bearer <access token de la personne>     (absent en mode anonyme,
 - **Assistant** : `POST /api/v1/assistants/{id}/executer` `{"question": "…", "canal": "api"}`
   → `passages[]` (titre, texte, url signée, source), `plan` (trace), `reponse` (texte
   rédigé, ou `null`).
-- **Collections** : `GET /api/v1/search?q=…&scope=a,b&limit=8` → `results[]` (titre,
-  extrait, url signée, collection).
+- **Collections** : `GET /api/v1/search?q=…&scope=a,b&limit=8` → contrat de recherche
+  MirAI : `results[] {id, title, date, url (signée), score, hits[] {snippet, highlights,
+  field, location, speaker, url}, context {collection {id, title}, right}}`. La carte
+  affiche `title`, les deux premiers `hits[].snippet` et `context.collection.title`.
 
 Rendu : les passages trouvés, cités et cliquables (les passages d'`executer` portent un
 lien signé et leur numéro d'`etape`). `reponse` vaut aujourd'hui toujours `null` : si elle

@@ -39,18 +39,67 @@
     ]
   },
   "search": {
+    "source": "mycollections",
+    "query": "titre de séjour",
+    "total": 2,
+    "truncated": false,
+    "total_is_lower_bound": false,
     "results": [
       {
-        "titre": "Article L. 423-1 — Exemple de passage",
-        "extrait": "Texte fictif d'un passage trouvé dans la collection, pour le développement de la bulle.",
+        "id": "ceseda:1",
+        "title": "Article L. 423-1 — Exemple de passage",
+        "date": null,
         "url": "https://mescollections.fake-domain.name/extrait/1?exp=0&sig=exemple",
-        "collection": "ceseda"
+        "score": 0.82,
+        "hits": [
+          {
+            "snippet": "Texte fictif d'un passage trouvé dans la collection, pour le développement de la bulle.",
+            "highlights": [],
+            "field": "content",
+            "location": {
+              "start_seconds": null,
+              "end_seconds": null,
+              "page": null
+            },
+            "speaker": null,
+            "url": "https://mescollections.fake-domain.name/extrait/1?exp=0&sig=exemple"
+          }
+        ],
+        "context": {
+          "collection": {
+            "id": "ceseda",
+            "title": "CESEDA"
+          },
+          "right": "lecture"
+        }
       },
       {
-        "titre": "Article L. 423-2 — Second passage",
-        "extrait": "Autre extrait fictif, cité et cliquable.",
+        "id": "ceseda:2",
+        "title": "Article L. 423-2 — Second passage",
+        "date": null,
         "url": "https://mescollections.fake-domain.name/extrait/2?exp=0&sig=exemple",
-        "collection": "ceseda"
+        "score": 0.61,
+        "hits": [
+          {
+            "snippet": "Autre extrait fictif, cité et cliquable.",
+            "highlights": [],
+            "field": "content",
+            "location": {
+              "start_seconds": null,
+              "end_seconds": null,
+              "page": null
+            },
+            "speaker": null,
+            "url": "https://mescollections.fake-domain.name/extrait/2?exp=0&sig=exemple"
+          }
+        ],
+        "context": {
+          "collection": {
+            "id": "ceseda",
+            "title": "CESEDA"
+          },
+          "right": "lecture"
+        }
       }
     ]
   },
