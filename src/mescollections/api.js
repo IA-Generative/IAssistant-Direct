@@ -105,14 +105,32 @@
     } catch (e) { return null; }
   }
 
-  function passage(p, champTexte) {
+  // Passage d'un assistant (`Passage` de Mes collections) : titre, texte, url, source, etape.
+  function passage(p) {
     if (!p || typeof p !== 'object') return null;
     const titre = texte(p.titre, MAX_TITRE);
-    const extrait = texte(p[champTexte], MAX_TEXTE);
+    const extrait = texte(p.texte, MAX_TEXTE);
     if (!titre && !extrait) return null;
-    const propre = { titre, texte: extrait, url: https(p.url), source: texte(p.source || p.collection, MAX_TITRE) };
-    if (Number.isInteger(p.etape) && p.etape > 0) propre.etape = p.etape;   // étape du plan (executer)
+    const propre = { titre, texte: extrait, url: https(p.url), source: texte(p.source, MAX_TITRE) };
+    if (Number.isInteger(p.etape) && p.etape > 0) propre.etape = p.etape;   // étape du plan
     return propre;
+  }
+
+  // Résultat de la recherche v1 (contrat de recherche MirAI) : un document, ses extraits
+  // (`hits[].snippet`) et sa collection (`context.collection.title`).
+  function resultat(r) {
+    if (!r || typeof r !== 'object') return null;
+    const hits = Array.isArray(r.hits) ? r.hits : [];
+    const extrait = hits.map((h) => h && h.snippet).filter((x) => typeof x === 'string' && x.trim()).slice(0, 2).join(' … ');
+    const titre = texte(r.title, MAX_TITRE);
+    if (!titre && !extrait) return null;
+    const collection = r.context && r.context.collection;
+    return {
+      titre,
+      texte: texte(extrait, MAX_TEXTE),
+      url: https(r.url) || https(hits.map((h) => h && h.url).find(Boolean)),
+      source: texte(collection && (collection.title || collection.id), MAX_TITRE)
+    };
   }
 
   async function executer(cfg, cible, question) {
@@ -126,7 +144,7 @@
     const d = r.donnees;
     return Object.assign(bloc, {
       reponse: typeof d.reponse === 'string' ? d.reponse.slice(0, MAX_REPONSE) : null,
-      passages: (Array.isArray(d.passages) ? d.passages : []).map((p) => passage(p, 'texte')).filter(Boolean).slice(0, MAX_PASSAGES),
+      passages: (Array.isArray(d.passages) ? d.passages : []).map(passage).filter(Boolean).slice(0, MAX_PASSAGES),
       plan: plan(d.plan)
     });
   }
@@ -139,7 +157,7 @@
     const d = r.donnees;
     return Object.assign(bloc, {
       reponse: null,
-      passages: (Array.isArray(d.results) ? d.results : []).map((p) => passage(p, 'extrait')).filter(Boolean).slice(0, MAX_PASSAGES),
+      passages: (Array.isArray(d.results) ? d.results : []).map(resultat).filter(Boolean).slice(0, MAX_PASSAGES),
       plan: null
     });
   }

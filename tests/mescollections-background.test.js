@@ -94,7 +94,7 @@ describe('questions depuis la bulle', () => {
     await surOngletMaj(7, { status: 'complete' }, { url: ONGLET.tab.url });
     global.fetch = jest.fn(async (url) => ({
       ok: true, status: 200, headers: { get: () => null },
-      json: async () => (String(url).includes('/search') ? { results: [{ titre: 'T', extrait: 'E', url: 'https://x.fake-domain.name/1' }] } : LISTE)
+      json: async () => (String(url).includes('/search') ? { results: [{ title: 'T', url: 'https://x.fake-domain.name/1', hits: [{ snippet: 'E' }], context: { collection: { id: 'c1', title: 'C1' } } }] } : LISTE)
     }));
   });
 
