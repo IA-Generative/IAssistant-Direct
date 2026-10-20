@@ -114,7 +114,7 @@ describe('dm/config.json', () => {
 
 describe('dm/dm-config.json (template DM)', () => {
   const tpl = readSrcJSON('dm/dm-config.json');
-  const ENV_KEYS = ['keycloakIssuerUrl', 'keycloakRealm', 'keycloakClientId',
+  const ENV_KEYS = ['keycloakIssuerUrl', 'keycloakRealm',
     'keycloak_redirect_uri', 'keycloak_allowed_redirect_uri', 'apiBase'];
 
   test('a le bon slug et configVersion', () => {
@@ -133,9 +133,11 @@ describe('dm/dm-config.json (template DM)', () => {
     }
   });
 
-  test('keycloakClientId est ${{KEYCLOAK_CLIENT_ID}} dans tous les profils', () => {
+  test('keycloakClientId est mirai-extension en dur dans tous les profils', () => {
+    // ${{KEYCLOAK_CLIENT_ID}} est le client du DM (bootstrap-iassistant) : servi à l'extension,
+    // il cassait la connexion (403 à l'échange du code) et le rafraîchissement du jeton.
     for (const prof of ['dev', 'int', 'prod']) {
-      expect(tpl[prof].keycloakClientId).toBe('${{KEYCLOAK_CLIENT_ID}}');
+      expect(tpl[prof].keycloakClientId).toBe('mirai-extension');
     }
   });
 });
