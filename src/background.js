@@ -178,11 +178,14 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       let attente = _pendingPkceVerifier && _pendingPkceTokenUrl
         ? { verifier: _pendingPkceVerifier, redirectUri: _pendingPkceRedirectUri, clientId: _pendingPkceClientId, tokenUrl: _pendingPkceTokenUrl }
         : null;
+      let origine = attente ? 'memory' : 'none';
       if (!attente) {
         const st = await _pkceStockage().get({ [PKCE_CLE]: null });
         const e = st[PKCE_CLE];
-        if (e && Date.now() - e.t < PKCE_VALIDITE_MS) attente = e;
+        if (e && Date.now() - e.t < PKCE_VALIDITE_MS) { attente = e; origine = 'storage'; }
+        else if (e) origine = 'expired';
       }
+      console.info('[MirAI] PKCE pending state:', origine);
       _pendingPkceVerifier = null;
       _pendingPkceRedirectUri = null;
       _pendingPkceClientId = null;
@@ -436,6 +439,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await _pkceStockage().set({ [PKCE_CLE]: {
           verifier: codeVerifier, redirectUri: callbackUrl, clientId, tokenUrl: _pendingPkceTokenUrl, t: Date.now()
         } });
+        console.info('[MirAI] PKCE login started (pending state saved).');
 
         api.tabs.create({ url: authUrl });
         sendResponse({ ok: true });
