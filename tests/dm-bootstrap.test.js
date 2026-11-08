@@ -307,3 +307,58 @@ describe('DMBootstrap', () => {
     });
   });
 });
+
+// ── Liens distribués par le DM (config.links) ────────────────────────────
+describe('getLinks() / getLink() — liens distribués par le DM', () => {
+  const PORTAIL = {
+    id: 'search-portal',
+    label: 'Chercher aussi dans d\'autres sources avec le portail de recherche',
+    url: 'https://monportail.numerique-interieur.com/',
+    hint: 'en bêta : s\'inscrire',
+    hintUrl: 'https://communaute.mirai.interieur.gouv.fr/invite/kguG2oQ'
+  };
+  const AVIS = { id: 'beta-feedback', label: 'Donner mon avis sur la bêta', url: 'https://monportail.numerique-interieur.com' };
+
+  test('sans liens servis, la liste est vide et getLink rend null', () => {
+    expect(window.DMBootstrap.getLinks()).toEqual([]);
+    expect(window.DMBootstrap.getLink('search-portal')).toBeNull();
+  });
+
+  test('les liens de la config DM sont lus par identifiant, champs optionnels compris', async () => {
+    global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ config: { links: [PORTAIL, AVIS] } }) });
+    await window.DMBootstrap.fetchConfig('https://dm.test');
+    expect(window.DMBootstrap.getLinks().map((l) => l.id)).toEqual(['search-portal', 'beta-feedback']);
+    expect(window.DMBootstrap.getLink('search-portal')).toEqual(PORTAIL);
+    expect(window.DMBootstrap.getLink('beta-feedback')).toEqual(AVIS);
+    expect(window.DMBootstrap.getLink('inconnu')).toBeNull();
+  });
+
+  test('une entrée hors contrat est écartée seule, pas la liste', () => {
+    const liens = window.DMBootstrap.normalizeLinks([
+      { id: 'Majuscule', label: 'x', url: 'https://a.test/' },
+      { id: 'http-only', label: 'x', url: 'http://a.test/' },
+      { id: 'sans-label', url: 'https://a.test/' },
+      { id: 'gabarit', label: 'x', url: 'https://a.test/${{VAR}}' },
+      { id: 'hint-douteux', label: 'x', url: 'https://a.test/', hint: 'ok', hintUrl: 'javascript:alert(1)' },
+      { id: 'hint-douteux', label: 'doublon', url: 'https://b.test/' },
+      'pas-un-objet',
+      AVIS
+    ]);
+    expect(liens).toEqual([{ id: 'hint-douteux', label: 'x', url: 'https://a.test/', hint: 'ok' }, AVIS]);
+  });
+
+  test('une liste reçue remplace la précédente en bloc : un lien retiré disparaît', async () => {
+    global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ config: { links: [PORTAIL, AVIS] } }) });
+    await window.DMBootstrap.fetchConfig('https://dm.test');
+    global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ config: { links: [AVIS] } }) });
+    await window.DMBootstrap.fetchConfig('https://dm.test');
+    expect(window.DMBootstrap.getLink('search-portal')).toBeNull();
+    expect(window.DMBootstrap.getLink('beta-feedback')).toEqual(AVIS);
+  });
+
+  test('la page options résume les liens en « id → url »', () => {
+    const masked = window.DMBootstrap.maskConfig({ links: [AVIS], apiBase: 'https://api.test' });
+    expect(masked.links).toBe('beta-feedback → https://monportail.numerique-interieur.com');
+    expect(masked.apiBase).toBe('https://api.test');
+  });
+});

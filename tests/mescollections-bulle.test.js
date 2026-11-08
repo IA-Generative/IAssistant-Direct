@@ -152,3 +152,38 @@ test('réponse fiable : badge, texte tel quel, plan « aucune recherche »', asy
   expect(racine.querySelector('details.plan').textContent).toContain('Réponse fiable retenue (ressemblance 91 %) : aucune recherche');
   expect(racine.textContent).not.toContain('Rien de pertinent');
 });
+
+describe('conseil « portail de recherche » (lien search-portal distribué par le DM)', () => {
+  const PORTAIL = {
+    id: 'search-portal',
+    label: 'Chercher aussi dans d\'autres sources avec le portail de recherche',
+    url: 'https://monportail.numerique-interieur.com/',
+    hint: 'en bêta : s\'inscrire',
+    hintUrl: 'https://communaute.mirai.interieur.gouv.fr/invite/kguG2oQ'
+  };
+
+  test('sans lien servi par le DM, aucun conseil n\'est rendu', async () => {
+    await ouvrir();
+    expect(racine.querySelector('.conseil-portail')).toBeNull();
+  });
+
+  test('avec le lien, chaque réponse se termine par le conseil et ses deux liens https', async () => {
+    __seedChromeStorage({ dmConfig: { links: [PORTAIL] } });
+    await ouvrir();
+    const conseil = racine.querySelector('.msg.lui .conseil-portail');
+    expect(conseil).not.toBeNull();
+    const liens = conseil.querySelectorAll('a');
+    expect(liens).toHaveLength(2);
+    expect(liens[0].textContent).toBe(PORTAIL.label + ' ↗');
+    expect(liens[0].href).toBe(PORTAIL.url);
+    expect(liens[0].target).toBe('_blank');
+    expect(liens[1].textContent).toBe(PORTAIL.hint);
+    expect(liens[1].href).toBe(PORTAIL.hintUrl);
+  });
+
+  test('un lien dont l\'url n\'est pas https n\'est pas rendu', async () => {
+    __seedChromeStorage({ dmConfig: { links: [{ ...PORTAIL, url: 'http://monportail.numerique-interieur.com/' }] } });
+    await ouvrir();
+    expect(racine.querySelector('.conseil-portail')).toBeNull();
+  });
+});
