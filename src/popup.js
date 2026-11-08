@@ -1109,6 +1109,43 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ======================================================================
+// Liens distribués par le DM (config.links) : seuls les rôles connus du popup
+// sont rendus ; un lien retiré côté DM disparaît au poll suivant.
+// ======================================================================
+const POPUP_LINK_IDS = ['beta-feedback', 'beta-signup'];
+
+function renderDmLinks() {
+  const zone = document.getElementById('dm-links');
+  if (!zone || !window.DMBootstrap) return;
+  const liens = window.DMBootstrap.getLinks().filter((l) => POPUP_LINK_IDS.includes(l.id));
+  zone.textContent = '';
+  zone.hidden = liens.length === 0;
+  liens.forEach((l) => {
+    const ligne = document.createElement('div');
+    const a = document.createElement('a');
+    a.href = l.url;
+    a.textContent = l.label;
+    a.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      if (window.DMTelemetry) window.DMTelemetry.sendSpan('link.click', { id: l.id });
+      CompatAPI.createTab({ url: l.url });
+    });
+    ligne.appendChild(a);
+    if (l.hint) {
+      const hint = document.createElement(l.hintUrl ? 'a' : 'span');
+      hint.className = 'dm-link-hint';
+      hint.textContent = `(${l.hint})`;
+      if (l.hintUrl) {
+        hint.href = l.hintUrl;
+        hint.addEventListener('click', (ev) => { ev.preventDefault(); CompatAPI.createTab({ url: l.hintUrl }); });
+      }
+      ligne.appendChild(hint);
+    }
+    zone.appendChild(ligne);
+  });
+}
+
+// ======================================================================
 // DM Bootstrap + Telemetry init + Update banner
 // ======================================================================
 (async function dmInit() {
@@ -1117,6 +1154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.DMBootstrap) {
       await window.DMBootstrap.init();
       console.info('[MirAI DM] Config loaded:', window.DMBootstrap.getConfig());
+      renderDmLinks();
     }
 
     // Init telemetry

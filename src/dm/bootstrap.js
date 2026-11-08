@@ -315,6 +315,38 @@ globalThis.DMBootstrap = {
     return cfg.features || {};
   },
 
+  // ── Liens distribués par le DM (config.links, contrat DM §4.2 bis) ────
+  // Liste plate résolue par le serveur, remplacée en bloc à chaque /config :
+  // aucune fusion ici, aucun repli codé en dur pour un lien que le DM a retiré.
+  // Une entrée hors contrat est ignorée individuellement (jamais la liste).
+  normalizeLinks(raw) {
+    if (!Array.isArray(raw)) return [];
+    const https = (u) => typeof u === 'string' && /^https:\/\/\S+$/i.test(u) && u.length <= 2048 && !/\$\{/.test(u);
+    const out = [];
+    const vus = new Set();
+    raw.forEach((e) => {
+      if (!e || typeof e !== 'object') return;
+      if (typeof e.id !== 'string' || !/^[a-z0-9][a-z0-9-]{1,39}$/.test(e.id) || vus.has(e.id)) return;
+      if (typeof e.label !== 'string' || !e.label.trim() || e.label.length > 80) return;
+      if (!https(e.url)) return;
+      const lien = { id: e.id, label: e.label.trim(), url: e.url };
+      if (typeof e.hint === 'string' && e.hint.trim() && e.hint.length <= 200) lien.hint = e.hint.trim();
+      if (https(e.hintUrl)) lien.hintUrl = e.hintUrl;
+      vus.add(e.id);
+      out.push(lien);
+    });
+    return out;
+  },
+
+  getLinks() {
+    return this.normalizeLinks(this.getConfig().links);
+  },
+
+  // {label, url, hint?, hintUrl?} ou null : l'appelant masque l'élément si null.
+  getLink(id) {
+    return this.getLinks().find((l) => l.id === id) || null;
+  },
+
   // ── Masquage des valeurs sensibles pour affichage (options) ───────────
   _isSensitiveKey(k) {
     return /(secret|token|password|passwd|api[-_]?key|client[-_]?key|authoriz|cred|bearer|private)/i.test(k);
@@ -329,12 +361,17 @@ globalThis.DMBootstrap = {
   },
 
   // Retourne une COPIE d'affichage : cles sensibles tronquees, cles _internes
-  // et tableaux/objets ignores. URLs/identifiants publics laisses en clair.
+  // et tableaux/objets ignores (sauf `links`, resume en « id → url »).
+  // URLs/identifiants publics laisses en clair.
   maskConfig(cfg, visible = 4) {
     const out = {};
     Object.keys(cfg || {}).forEach((k) => {
       if (k.startsWith('_')) return;
       const v = cfg[k];
+      if (k === 'links') {
+        out[k] = this.normalizeLinks(v).map((l) => `${l.id} → ${l.url}`).join(' ; ') || '(aucun)';
+        return;
+      }
       if (v && typeof v === 'object') return; // tableaux/objets non affiches a plat
       out[k] = this._isSensitiveKey(k) ? this.maskValue(v, visible) : v;
     });

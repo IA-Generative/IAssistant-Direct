@@ -166,6 +166,20 @@ DM est injoignable.
 > et l'indirection `relay-assistant/keycloak` (ancien ADR §2/§3) ne sont **plus utilises
 > par l'extension**.
 
+### Liens distribues par le DM (`config.links`)
+
+Le DM sert dans `/config` une liste plate `links` : `{id, label, url, hint?, hintUrl?}`,
+resolue cote serveur et **remplacee en bloc** a chaque poll (stockee telle quelle dans
+`dmConfig`). L'extension ne rend que les roles qu'elle connait, rien n'est code en dur :
+
+| Role (`id`) | Ou | Effet |
+|---|---|---|
+| `beta-feedback`, `beta-signup` | popup, sous les raccourcis | lien ouvert dans un nouvel onglet (`hint` entre parentheses) |
+| `search-portal` | bulle « Mes collections », sous chaque reponse | conseil « chercher aussi dans d'autres sources » |
+
+Accesseurs : `DMBootstrap.getLinks()` / `getLink(id)` (validation : id kebab-case, `https://`
+obligatoire, longueurs). Contrat : device-management, `docs/plugin-developer` §4.2 bis.
+
 ## Deploy
 
 ```bash

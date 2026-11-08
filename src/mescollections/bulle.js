@@ -148,6 +148,32 @@
   };
   const garderPrefs = () => { try { B.storage.local.set({ [CLE_PREFS]: prefs }); } catch (e) { /* sans mémoire */ } };
 
+  // ── Lien « portail de recherche » distribué par le DM (config.links, id search-portal) ──
+  // Lu dans la config DM mise en cache par l'extension ; absent = rien d'affiché.
+  let lienPortail = null;
+  const lireLienPortail = async () => {
+    lienPortail = null;
+    try {
+      const st = await B.storage.local.get({ dmConfig: null });
+      const liens = Array.isArray(st.dmConfig && st.dmConfig.links) ? st.dmConfig.links : [];
+      const l = liens.find((e) => e && e.id === 'search-portal');
+      if (l && typeof l.label === 'string' && l.label.trim() && estHttps(l.url)) {
+        lienPortail = { label: l.label.trim(), url: l.url, hint: typeof l.hint === 'string' ? l.hint.trim() : '', hintUrl: estHttps(l.hintUrl) ? l.hintUrl : '' };
+      }
+    } catch (e) { /* pas de lien */ }
+  };
+  const conseilPortail = () => {
+    if (!lienPortail) return null;
+    const p = el('p', { className: 'etiquette conseil-portail' });
+    p.append(lien(lienPortail.url, lienPortail.label + ' ↗'));
+    if (lienPortail.hint) {
+      p.append(' (');
+      p.append(lienPortail.hintUrl ? lien(lienPortail.hintUrl, lienPortail.hint) : lienPortail.hint);
+      p.append(')');
+    }
+    return p;
+  };
+
   // ── État ─────────────────────────────────────────────────────────────
   let cibles = [];
   let etat = 'connecte';
@@ -496,6 +522,8 @@
       }
     }
     if (!bloc.reponse && !passages.length) m.append(el('p', {}, 'Rien de pertinent trouvé dans cette source.'));
+    const conseil = conseilPortail();
+    if (conseil) m.append(conseil);
     if (bloc.plan) {
       const d = el('details', { className: 'plan' });
       d.append(el('summary', {}, 'Comment l\'assistant a cherché'));
@@ -557,6 +585,7 @@
   async function afficher(nouvelles, nouvelEtat) {
     derniereDemande = { cibles: nouvelles, etat: nouvelEtat };
     await lirePrefs();
+    await lireLienPortail();
     if (prefs.masques.includes(HOTE)) return;
     if (!ui) construire();
     cibles = nouvelles;

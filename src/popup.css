@@ -68,3 +68,7 @@ input{padding:6px;border:1px solid #ccc;border-radius:6px;flex:1}
 .mc-lien{background:none;border:0;padding:0;color:#0072cf;text-decoration:underline;cursor:pointer;font:inherit}
 .mc-lien:disabled{color:#999;cursor:default}
 .mc[hidden],.mc-maj[hidden],.conference.mc-cache{display:none !important}
+
+.dm-links{display:flex;flex-direction:column;gap:4px;font-size:11px;margin-top:6px;padding:4px 6px;border-top:1px solid #ddd}
+.dm-links a{color:#0072cf;text-decoration:underline}
+.dm-links .dm-link-hint{color:#666;margin-left:4px}

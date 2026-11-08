@@ -29,7 +29,7 @@ npm run test:coverage   # rapport de couverture
 |---------------------------|----------------------------------------------------------|
 | `auth.test.js`            | PKCE flow, refresh, enrollment DM, relay, logout         |
 | `background.test.js`      | Service worker, UUID, alarm 30min, notifications update  |
-| `dm-bootstrap.test.js`    | Config fetch, cache, fallback, merge, headers DM         |
+| `dm-bootstrap.test.js`    | Config fetch, cache, fallback, merge, headers DM, liens `config.links` |
 | `dm-telemetry.test.js`    | Spans OTLP, buffer, flush, retry, token refresh          |
 | `manifest-html.test.js`   | Structure manifest, profils config, ordre des scripts    |
 | `url-refactoring.test.js` | Migration URLs hardcodees vers config DM + auth.js       |
